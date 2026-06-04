@@ -105,6 +105,11 @@ class ReviewIn(BaseModel):
 
 
 # NOTE: protect this with a service credential, not a user token — it's scheduler-driven.
+@app.get("/coach/review/latest")
+async def latest_review(user_id: str = Depends(get_current_user_id)):
+    return await _state["repo"].get_latest_review(user_id)
+
+
 @app.post("/coach/review/run")
 async def run_review(body: ReviewIn, user_id: str = Depends(get_current_user_id)):
     if _state["review"] is None:

@@ -355,3 +355,46 @@ class PostgresCoachRepo:
             """,
             session_id, user_id, completed_at,
         )
+
+    # --- trends (weight series for charting + idempotent weight logging) ------
+    async def get_weight_series(self, user_id: str, window_days: int) -> list[dict]:
+        """Daily-averaged weight points for the trend chart (smooths intra-day noise)."""
+        rows = await self._pool.fetch(
+            """
+            select (recorded_at at time zone 'utc')::date as d, avg(weight_kg) as w
+            from body_metrics
+            where user_id = $1::uuid and weight_kg is not null
+              and recorded_at >= now() - make_interval(days => $2::int)
+            group by 1 order by d
+            """,
+            user_id, window_days,
+        )
+        return [{"date": r["d"].isoformat(), "weight_kg": float(r["w"])} for r in rows]
+
+    async def insert_body_metric(self, user_id: str, metric_id: str, recorded_at, weight_kg) -> None:
+        """Idempotent (client-generated id) so offline weight entries replay safely."""
+        await self._pool.execute(
+            """
+            insert into body_metrics (id, user_id, recorded_at, weight_kg)
+            values ($1::uuid, $2::uuid, $3, $4)
+            on conflict (id) do nothing
+            """,
+            metric_id, user_id, recorded_at, weight_kg,
+        )
+
+    async def get_latest_review(self, user_id: str) -> Optional[dict]:
+        row = await self._pool.fetchrow(
+            """
+            select review_id::text as review_id, status, summary, changes, created_at
+            from coach_reviews where user_id = $1::uuid
+            order by created_at desc limit 1
+            """,
+            user_id,
+        )
+        if row is None:
+            return None
+        return {
+            "review_id": row["review_id"], "status": row["status"],
+            "summary": row["summary"], "changes": _as_list(row["changes"]) if False else row["changes"],
+            "created_at": row["created_at"].isoformat(),
+        }

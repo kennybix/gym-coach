@@ -79,3 +79,30 @@ class SessionCompleteIn(BaseModel):
 async def session_complete(body: SessionCompleteIn, user_id: str = Depends(get_current_user_id)):
     await _repo.complete_session(user_id, body.session_id, body.completed_at or _now())
     return {"status": "ok"}
+
+
+@router.get("/trends")
+async def trends(window: int = 30, user_id: str = Depends(get_current_user_id)):
+    profile = await _repo.get_profile(user_id)
+    trend = await _repo.get_weight_trend(user_id, window)
+    adherence = await _repo.get_adherence(user_id, window)
+    series = await _repo.get_weight_series(user_id, window)
+    return {
+        "window_days": window,
+        "goal_weight_kg": profile.goal_weight_kg,
+        "weight_series": series,
+        "trend": trend.model_dump(),
+        "adherence": adherence.model_dump(),
+    }
+
+
+class WeightIn(BaseModel):
+    id: str  # client-generated uuid -> idempotency key
+    weight_kg: float
+    recorded_at: datetime
+
+
+@router.post("/metrics/weight")
+async def log_weight(body: WeightIn, user_id: str = Depends(get_current_user_id)):
+    await _repo.insert_body_metric(user_id, body.id, body.recorded_at, body.weight_kg)
+    return {"status": "ok"}
