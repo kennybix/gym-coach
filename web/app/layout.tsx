@@ -20,8 +20,9 @@ export const viewport: Viewport = {
 const TABS = [
   { href: "/", label: "TODAY" },
   { href: "/trends", label: "TRENDS" },
+  { href: "/nutrition", label: "FUEL" },
   { href: "/coach", label: "COACH" },
-  { href: "/settings", label: "SET-UP" },
+  { href: "/settings", label: "SETUP" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -40,12 +41,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SwRegister />
         <main className="flex-1 w-full max-w-md mx-auto px-4 pb-28 pt-5">{children}</main>
         <nav className="fixed bottom-0 inset-x-0 border-t border-line bg-panel/95 backdrop-blur">
-          <div className="max-w-md mx-auto grid grid-cols-4">
+          <div className="max-w-md mx-auto grid grid-cols-5">
             {TABS.map((t) => (
               <Link
                 key={t.href}
                 href={t.href}
-                className="font-display text-[11px] tracking-[0.18em] text-dim text-center py-4 active:text-volt"
+                className="font-display text-[10px] tracking-[0.12em] text-dim text-center py-4 active:text-volt"
               >
                 {t.label}
               </Link>

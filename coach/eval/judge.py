@@ -41,7 +41,7 @@ class Judge:
     def __init__(self, model_id=None):
         import os
         from langchain.chat_models import init_chat_model
-        model_id = model_id or os.environ.get("COACH_JUDGE_MODEL", "openai:gpt-4o")
+        model_id = model_id or os.environ.get("COACH_JUDGE_MODEL", "google_genai:gemini-3.5-flash")
         self._llm = init_chat_model(model_id, temperature=0).with_structured_output(JudgeVerdict)
 
     async def score(self, context: dict) -> JudgeVerdict:

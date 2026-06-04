@@ -106,3 +106,24 @@ class WeightIn(BaseModel):
 async def log_weight(body: WeightIn, user_id: str = Depends(get_current_user_id)):
     await _repo.insert_body_metric(user_id, body.id, body.recorded_at, body.weight_kg)
     return {"status": "ok"}
+
+
+@router.get("/nutrition")
+async def nutrition(window: int = 14, user_id: str = Depends(get_current_user_id)):
+    summary = await _repo.get_nutrition_summary(user_id, window)
+    series = await _repo.get_nutrition_series(user_id, window)
+    return {**summary.model_dump(), "series": series}
+
+
+class NutritionIn(BaseModel):
+    logged_on: Optional[str] = None  # ISO date; defaults to today
+    kcal: Optional[int] = None
+    protein_g: Optional[float] = None
+
+
+@router.post("/nutrition")
+async def log_nutrition(body: NutritionIn, user_id: str = Depends(get_current_user_id)):
+    from datetime import date
+    day = date.fromisoformat(body.logged_on) if body.logged_on else _now().date()
+    await _repo.upsert_nutrition_day(user_id, day, body.kcal, body.protein_g)
+    return {"status": "ok", "logged_on": day.isoformat()}

@@ -25,7 +25,7 @@ from .review import build_review_graph
 from .pg_repo import PostgresCoachRepo
 
 DB_URI = os.environ["COACH_DB_URI"]
-MODEL_ID = os.environ.get("COACH_MODEL", "openai:gpt-4o")
+MODEL_ID = os.environ.get("COACH_MODEL", "google_genai:gemini-3.5-flash")
 SEED_DIR = os.environ.get("COACH_SEED_DIR", "./seed")
 
 _state: dict = {}

@@ -16,6 +16,7 @@ be calibrated with a qualified clinician before launch; the values here are plac
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import Optional
 
@@ -176,3 +177,47 @@ def screen_coach_reply(text: str) -> ScreenResult:
     if _contains(text, _TRAIN_THROUGH_INJURY):
         return ScreenResult(flagged=True, category="train_through_injury")
     return ScreenResult(flagged=False)
+
+
+# =============================================================================
+# 3. Canonical crisis/redirect copy (single source of truth)
+# =============================================================================
+# Shared by the coach graph AND the RAG answerer so safety copy can't drift between
+# surfaces. The support resource is operator-configured per region: set
+# COACH_SUPPORT_RESOURCE to a CURRENT, region-correct, clinician-reviewed service.
+# Do NOT hardcode a national helpline that may be disconnected or out of region —
+# e.g. do NOT use the NEDA Helpline, which has been discontinued. Defaults empty so
+# a wrong/stale resource is never shown; the copy still validates and keeps the door open.
+SUPPORT_RESOURCE = os.environ.get("COACH_SUPPORT_RESOURCE", "").strip()
+
+
+def _with_support(text: str) -> str:
+    return f"{text} {SUPPORT_RESOURCE}".strip() if SUPPORT_RESOURCE else text
+
+
+# Numberless, no appearance commentary, routes toward specialized support.
+REDIRECTS = {
+    "disordered_eating": _with_support(
+        "I care about how you're doing, and this is something I'm not the right tool for. "
+        "What you're describing deserves support from people trained specifically in this. "
+        "If it would help, I can help you find eating-disorder support near you."
+    ),
+    "self_harm": _with_support(
+        "I'm really glad you told me, and I want to make sure you're safe. I'm not able to be "
+        "the right kind of support here, but you don't have to handle this alone — I can help "
+        "you find people who can talk with you right now if you'd like."
+    ),
+    "extreme_deficit": (
+        "I can't help with losing weight that fast — it isn't safe and tends to backfire. "
+        "I can help you set a sustainable pace instead."
+    ),
+    "train_through_injury": (
+        "I won't help you push through an injury. Let's let it be assessed and recover first; "
+        "I can suggest ways to stay active that don't aggravate it."
+    ),
+}
+GENERIC_SAFE = "I'm not able to help with that safely, but I'm happy to help another way."
+
+
+def redirect_for(category: str | None) -> str:
+    return REDIRECTS.get(category or "", GENERIC_SAFE)

@@ -23,19 +23,8 @@ NOT_MEDICAL = " This is general information, not medical advice."
 NO_SOURCE = ("I don't have a vetted source on that, so I'd rather not guess — I can only "
              "answer from our reviewed, openly-licensed references.")
 
-# Numberless, region-appropriate redirects. LOCALIZE + CLINICALLY REVIEW; no hardcoded helpline.
-REDIRECTS = {
-    "disordered_eating": ("I'm not able to help with that here, and I want to be honest: this "
-                          "deserves support from people trained specifically in it. Specialized "
-                          "eating-disorder services in your area are the best place to turn."),
-    "self_harm": ("I'm really glad you reached out. I'm not the right kind of support for this, "
-                  "but you don't have to handle it alone — I can help you find people who can talk with you."),
-    "extreme_deficit": ("I can't help with rapid or extreme approaches — they aren't safe. I can "
-                        "share sustainable basics from our references instead."),
-    "train_through_injury": ("I won't help you train through an injury — let's get it assessed and "
-                             "let it recover first."),
-}
-GENERIC_SAFE = "I can't help with that safely, but I'm happy to help another way."
+REDIRECTS = safety.REDIRECTS  # single source of truth (coach + RAG share it)
+GENERIC_SAFE = safety.GENERIC_SAFE
 
 
 class FakeGenerator:
@@ -50,7 +39,7 @@ class Generator:
     def __init__(self, model_id=None):
         import os
         from langchain.chat_models import init_chat_model
-        model_id = model_id or os.environ.get("COACH_RAG_MODEL", "openai:gpt-4o")
+        model_id = model_id or os.environ.get("COACH_RAG_MODEL", "google_genai:gemini-3.5-flash")
         self._llm = init_chat_model(model_id, temperature=0)
 
     def generate(self, query, chunks):
@@ -79,7 +68,7 @@ def answer(query, store, embedder=None, generator=None, k: int = 4, threshold: f
     # 1. inbound screen — shared with the coach's safety layer
     screen = safety.screen_user_message(query)
     if screen.flagged:
-        return CitedAnswer(answer=REDIRECTS.get(screen.category, GENERIC_SAFE), citations=[], grounded=False)
+        return CitedAnswer(answer=safety.redirect_for(screen.category), citations=[], grounded=False)
 
     # 2. retrieve from the vetted corpus
     hits = retrieve(query, store, embedder, k=k, threshold=threshold)

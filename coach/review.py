@@ -39,7 +39,7 @@ REVIEW_PROMPT = (
 )
 
 
-def build_review_graph(repo: CoachRepo, model_id: str = "openai:gpt-4o"):
+def build_review_graph(repo: CoachRepo, model_id: str = "google_genai:gemini-3.5-flash"):
     assessor = init_chat_model(model_id, temperature=0.2).with_structured_output(
         ReviewAssessment
     )

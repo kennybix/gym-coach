@@ -398,3 +398,32 @@ class PostgresCoachRepo:
             "summary": row["summary"], "changes": _as_list(row["changes"]) if False else row["changes"],
             "created_at": row["created_at"].isoformat(),
         }
+
+    # --- nutrition (day-level; logging-consistency framing) ------------------
+    async def upsert_nutrition_day(self, user_id: str, logged_on, kcal, protein_g) -> None:
+        """One row per day (natural key user_id+logged_on) => offline replay is idempotent."""
+        await self._pool.execute(
+            """
+            insert into nutrition_logs (user_id, logged_on, kcal, protein_g)
+            values ($1::uuid, $2, $3, $4)
+            on conflict (user_id, logged_on)
+            do update set kcal = excluded.kcal, protein_g = excluded.protein_g
+            """,
+            user_id, logged_on, kcal, protein_g,
+        )
+
+    async def get_nutrition_series(self, user_id: str, window_days: int) -> list[dict]:
+        rows = await self._pool.fetch(
+            """
+            select logged_on::text as date, kcal, protein_g
+            from nutrition_logs
+            where user_id = $1::uuid and logged_on >= current_date - ($2::int - 1)
+            order by logged_on
+            """,
+            user_id, window_days,
+        )
+        return [
+            {"date": r["date"], "kcal": r["kcal"],
+             "protein_g": float(r["protein_g"]) if r["protein_g"] is not None else None}
+            for r in rows
+        ]
