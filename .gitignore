@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 exercises_raw.json
+web/node_modules/
+web/.next/
+web/next-env.d.ts

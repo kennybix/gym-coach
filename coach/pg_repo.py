@@ -279,3 +279,79 @@ class PostgresCoachRepo:
             json.dumps(changes),
         )
         return str(row["review_id"])
+
+    # --- logging API (PWA Today screen; idempotent for offline replay) --------
+    async def get_program_slots(self, user_id: str) -> list[dict]:
+        """Program slots with prescriptions + catalog media, for the session UI."""
+        rows = await self._pool.fetch(
+            """
+            select pe.program_exercise_id, pe.exercise_id, pe.position,
+                   pe.sets, pe.reps, pe.load_kg
+            from program_exercises pe
+            join programs p on p.program_id = pe.program_id
+            where p.user_id = $1::uuid and p.is_active
+            order by pe.position
+            """,
+            user_id,
+        )
+        out = []
+        for r in rows:
+            detail = self._catalog.detail_of(r["exercise_id"])
+            out.append({
+                "program_exercise_id": str(r["program_exercise_id"]),
+                "position": r["position"],
+                "sets": r["sets"],
+                "reps": r["reps"],
+                "load_kg": float(r["load_kg"]) if r["load_kg"] is not None else None,
+                **detail,
+            })
+        return out
+
+    async def start_session(self, user_id: str, session_id: str, started_at) -> None:
+        """Idempotent: client generates the session UUID so offline replays are safe."""
+        await self._pool.execute(
+            """
+            insert into sessions (session_id, user_id, program_id, started_at)
+            select $2::uuid, $1::uuid, p.program_id, $3
+            from programs p where p.user_id = $1::uuid and p.is_active
+            limit 1
+            on conflict (session_id) do nothing
+            """,
+            user_id, session_id, started_at,
+        )
+
+    async def insert_set_logs(self, user_id: str, session_id: str, sets: list[dict]) -> int:
+        """Idempotent batch insert: client-generated set ids; replays insert nothing new.
+        The session-ownership check stops a forged session_id from attaching sets to
+        another user's session."""
+        owned = await self._pool.fetchval(
+            "select 1 from sessions where session_id = $1::uuid and user_id = $2::uuid",
+            session_id, user_id,
+        )
+        if not owned:
+            raise PermissionError(f"session {session_id!r} not found for user {user_id!r}")
+        inserted = 0
+        async with self._pool.acquire() as con:
+            async with con.transaction():
+                for s in sets:
+                    status = await con.execute(
+                        """
+                        insert into set_logs (id, session_id, user_id, exercise_id,
+                                              reps, weight_kg, rpe, logged_at)
+                        values ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8)
+                        on conflict (id) do nothing
+                        """,
+                        s["id"], session_id, user_id, s["exercise_id"],
+                        s.get("reps"), s.get("weight_kg"), s.get("rpe"), s["logged_at"],
+                    )
+                    inserted += int(status.rsplit(" ", 1)[-1])
+        return inserted
+
+    async def complete_session(self, user_id: str, session_id: str, completed_at) -> None:
+        await self._pool.execute(
+            """
+            update sessions set completed_at = coalesce(completed_at, $3)
+            where session_id = $1::uuid and user_id = $2::uuid
+            """,
+            session_id, user_id, completed_at,
+        )

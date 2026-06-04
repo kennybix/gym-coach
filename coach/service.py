@@ -6,15 +6,19 @@ persistent memory and resumable confirmation interrupts.
 """
 from __future__ import annotations
 
+import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
 from pydantic import BaseModel
 
+from fastapi.middleware.cors import CORSMiddleware
+
+from . import api as rest_api
 from .auth import get_current_user_id
 from .graph import build_coach_graph
 from .review import build_review_graph
@@ -32,9 +36,15 @@ async def lifespan(app: FastAPI):
     async with AsyncPostgresSaver.from_conn_string(DB_URI) as saver:
         await saver.setup()
         repo = await PostgresCoachRepo.create(DB_URI, SEED_DIR)
+        rest_api.bind_repo(repo)
         _state["repo"] = repo
-        _state["chat"] = build_coach_graph(repo, checkpointer=saver, model_id=MODEL_ID)
-        _state["review"] = build_review_graph(repo, model_id=MODEL_ID)
+        try:
+            _state["chat"] = build_coach_graph(repo, checkpointer=saver, model_id=MODEL_ID)
+            _state["review"] = build_review_graph(repo, model_id=MODEL_ID)
+        except Exception as exc:  # missing provider pkg/key must not kill the logging API
+            logging.warning("coach graphs unavailable (LLM not configured): %s", exc)
+            _state["chat"] = None
+            _state["review"] = None
         try:
             yield
         finally:
@@ -42,6 +52,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(rest_api.router)
+app.add_middleware(  # PWA dev origin; tighten for deployment
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def _cfg(user_id: str, thread_id: str) -> dict:
@@ -56,6 +73,8 @@ class ChatIn(BaseModel):
 @app.post("/coach/chat")
 async def chat(body: ChatIn, user_id: str = Depends(get_current_user_id)):
     graph = _state["chat"]
+    if graph is None:
+        raise HTTPException(503, "coach unavailable: LLM provider not configured")
     config = _cfg(user_id, body.thread_id)
     result = await graph.ainvoke({"messages": [HumanMessage(body.message)]}, config=config)
 
@@ -74,6 +93,8 @@ class ConfirmIn(BaseModel):
 @app.post("/coach/confirm")
 async def confirm(body: ConfirmIn, user_id: str = Depends(get_current_user_id)):
     graph = _state["chat"]
+    if graph is None:
+        raise HTTPException(503, "coach unavailable: LLM provider not configured")
     config = _cfg(user_id, body.thread_id)
     result = await graph.ainvoke(Command(resume=body.approved), config=config)
     return {"status": "ok", "reply": result["messages"][-1].content}
@@ -86,6 +107,8 @@ class ReviewIn(BaseModel):
 # NOTE: protect this with a service credential, not a user token — it's scheduler-driven.
 @app.post("/coach/review/run")
 async def run_review(body: ReviewIn, user_id: str = Depends(get_current_user_id)):
+    if _state["review"] is None:
+        raise HTTPException(503, "coach unavailable: LLM provider not configured")
     out = await _state["review"].ainvoke(
         {"user_id": user_id, "window_days": body.window_days, "committed_changes": {}}
     )

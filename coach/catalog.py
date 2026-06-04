@@ -28,6 +28,8 @@ class CatalogVariantIndex:
     def __init__(self, exercises: list[dict], variant_groups: list[dict]) -> None:
         self._name = {e["id"]: e["name"] for e in exercises}
         self._equipment = {e["id"]: e["equipment"] for e in exercises}
+        self._images = {e["id"]: e.get("image_urls", []) for e in exercises}
+        self._cues = {e["id"]: e.get("cues", []) for e in exercises}
         self._group_for: dict[str, dict] = {}
         for g in variant_groups:
             for ids in g["by_equipment"].values():
@@ -46,6 +48,16 @@ class CatalogVariantIndex:
 
     def equipment_of(self, exercise_id: str) -> str:
         return self._equipment.get(exercise_id, "other")
+
+    def detail_of(self, exercise_id: str) -> dict:
+        """Media + coaching cues for the UI."""
+        return {
+            "exercise_id": exercise_id,
+            "name": self.name_of(exercise_id),
+            "equipment": self.equipment_of(exercise_id),
+            "image_urls": self._images.get(exercise_id, []),
+            "cues": self._cues.get(exercise_id, []),
+        }
 
     def find_equipment_variant(
         self, exercise_id: str, available_equipment: set[str]
