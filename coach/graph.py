@@ -14,6 +14,8 @@ Invariants:
 """
 from __future__ import annotations
 
+import os
+
 from typing import Annotated, Literal, Optional, TypedDict
 
 from langchain.chat_models import init_chat_model
@@ -54,15 +56,27 @@ SYSTEM_PROMPT = (
     "You are not a medical professional; say so when relevant."
 )
 
-# Placeholder copy — must be localized and clinically reviewed before launch.
+# Region-appropriate support resource appended to the sensitive redirects.
+# OPERATOR MUST SET COACH_SUPPORT_RESOURCE to a CURRENT, region-correct service and
+# have the wording reviewed by a qualified professional. Do NOT hardcode a national
+# helpline that may be disconnected or out of region — e.g. do NOT use the NEDA
+# Helpline, which has been discontinued. Defaults to empty so we never surface a
+# wrong or stale resource; the copy still validates and keeps the door open without it.
+SUPPORT_RESOURCE = os.environ.get("COACH_SUPPORT_RESOURCE", "").strip()
+
+
+def _with_support(text: str) -> str:
+    return f"{text} {SUPPORT_RESOURCE}".strip() if SUPPORT_RESOURCE else text
+
+
 # Deliberately free of numbers/appearance commentary; routes toward specialized support.
 SAFE_REDIRECTS = {
-    "disordered_eating": (
+    "disordered_eating": _with_support(
         "I care about how you're doing, and this is something I'm not the right tool for. "
         "What you're describing deserves support from people trained specifically in this. "
-        "If it would help, I can point you toward eating-disorder support services in your area."
+        "If it would help, I can help you find eating-disorder support near you."
     ),
-    "self_harm": (
+    "self_harm": _with_support(
         "I'm really glad you told me, and I want to make sure you're safe. I'm not able to be "
         "the right kind of support here, but you don't have to handle this alone — I can help "
         "you find people who can talk with you right now if you'd like."
