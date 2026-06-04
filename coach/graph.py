@@ -91,7 +91,7 @@ def build_coach_graph(repo: CoachRepo, checkpointer, model_id: str = "openai:gpt
         if state.get("profile"):
             return {"user_id": uid}
         profile = await repo.get_profile(uid)
-        return {"user_id": uid, "profile": profile.model_dump()}
+        return {"user_id": uid, "profile": profile.model_dump(mode="json")}
 
     async def screen_in(state: CoachState) -> dict:
         last_human = next(
