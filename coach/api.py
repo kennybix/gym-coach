@@ -14,7 +14,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from . import safety as safety_mod
 from .auth import get_current_user_id
+from .models import Targets
 
 router = APIRouter(prefix="/api")
 
@@ -127,3 +129,90 @@ async def log_nutrition(body: NutritionIn, user_id: str = Depends(get_current_us
     day = date.fromisoformat(body.logged_on) if body.logged_on else _now().date()
     await _repo.upsert_nutrition_day(user_id, day, body.kcal, body.protein_g)
     return {"status": "ok", "logged_on": day.isoformat()}
+
+
+# ----------------------------- onboarding -----------------------------------
+
+@router.get("/onboarding/status")
+async def onboarding_status(user_id: str = Depends(get_current_user_id)):
+    try:
+        await _repo.get_profile(user_id)
+        return {"onboarded": True}
+    except LookupError:
+        return {"onboarded": False}
+
+
+class OnboardIn(BaseModel):
+    sex: str
+    birth_year: int
+    height_cm: float
+    activity_level: str
+    current_weight_kg: float
+    goal_weight_kg: float
+    weekly_rate_kg: float = Field(ge=0)
+    injury_active: bool = False
+    eating_disorder_history: bool = False
+
+
+@router.post("/onboarding")
+async def onboard(body: OnboardIn, user_id: str = Depends(get_current_user_id)):
+    import uuid as _uuid
+
+    flags: list[str] = []
+    if body.injury_active:
+        flags.append("injury_active")
+    if body.eating_disorder_history:
+        flags.append("eating_disorder_history")
+
+    # cap the goal rate server-side (client also caps; never trust the client)
+    rate = min(body.weekly_rate_kg, safety_mod.MAX_SAFE_WEEKLY_RATE_KG)
+    rate_capped = rate < body.weekly_rate_kg
+
+    await _repo.create_profile(
+        user_id, sex=body.sex, birth_year=body.birth_year, height_cm=body.height_cm,
+        activity_level=body.activity_level, goal_weight_kg=body.goal_weight_kg,
+        weekly_rate_kg=rate, medical_flags=flags,
+    )
+    await _repo.insert_body_metric(user_id, str(_uuid.uuid4()), _now(), body.current_weight_kg)
+
+    profile = await _repo.get_profile(user_id)
+    est = safety_mod.estimate_initial_target(profile, body.current_weight_kg)
+    if est is None:
+        return {"status": "ok", "targets_disabled": True, "rate_capped": rate_capped,
+                "note": ("Automated calorie targets are off. Your coach will support training; "
+                         "for nutrition guidance, specialized professionals are the right partner.")}
+
+    daily_kcal, protein_g = est
+    target = await _repo.insert_target(user_id, Targets(
+        daily_kcal=daily_kcal, protein_g=protein_g, source="onboarding",
+        rationale="Onboarding starting point — conservative estimate; your coach adjusts it from your real data.",
+    ))
+    return {"status": "ok", "targets_disabled": False, "rate_capped": rate_capped,
+            "target": target.model_dump(mode="json")}
+
+
+@router.get("/catalog/exercises")
+async def catalog_exercises(q: str | None = None, equipment: str | None = None,
+                            user_id: str = Depends(get_current_user_id)):
+    return {"exercises": _repo.search_catalog(q=q, equipment=equipment, limit=30)}
+
+
+class ProgramExerciseIn(BaseModel):
+    exercise_id: str
+    sets: int = Field(ge=1, le=10)
+    reps: int = Field(ge=1, le=100)
+
+
+class ProgramIn(BaseModel):
+    name: str = "Main"
+    sessions_per_week: int = Field(ge=1, le=7)
+    exercises: list[ProgramExerciseIn] = Field(min_length=1)
+
+
+@router.post("/program")
+async def create_program(body: ProgramIn, user_id: str = Depends(get_current_user_id)):
+    pid = await _repo.create_program(
+        user_id, body.name, body.sessions_per_week,
+        [e.model_dump() for e in body.exercises],
+    )
+    return {"status": "ok", "program_id": pid}

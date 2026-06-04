@@ -140,6 +140,19 @@ export default function SessionLogger() {
 
   if (!slots) return <Panel><p className="text-dim text-sm tnum">loading…</p></Panel>;
 
+  if (slots.length === 0)
+    return (
+      <Panel>
+        <p className="text-dim text-sm leading-relaxed">
+          Nothing scheduled yet. Run the first-time setup to create your profile and build a
+          program from the exercise catalog.
+        </p>
+        <a href="/onboarding" className="mt-4 block w-full h-12 leading-[3rem] text-center bg-volt text-ink font-display font-semibold tracking-[0.2em] active:bg-voltdim">
+          START SETUP
+        </a>
+      </Panel>
+    );
+
   return (
     <div className="space-y-4">
       <header className="flex items-end justify-between rise">

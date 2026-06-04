@@ -16,6 +16,8 @@ be calibrated with a qualified clinician before launch; the values here are plac
 """
 from __future__ import annotations
 
+from datetime import date
+
 import os
 import re
 from typing import Optional
@@ -221,3 +223,35 @@ GENERIC_SAFE = "I'm not able to help with that safely, but I'm happy to help ano
 
 def redirect_for(category: str | None) -> str:
     return REDIRECTS.get(category or "", GENERIC_SAFE)
+
+
+# =============================================================================
+# 4. Onboarding: conservative initial target (clamped by the same floors)
+# =============================================================================
+ACTIVITY_MULTIPLIER = {"sedentary": 1.2, "light": 1.375, "moderate": 1.55, "active": 1.725}
+KCAL_PER_KG = 7700  # approximate energy density of body mass change
+
+
+def estimate_initial_target(profile: Profile, current_weight_kg: float):
+    """Conservative starting target from a standard estimate (Mifflin-St Jeor) minus a
+    modest deficit derived from the CAPPED goal rate, clamped to the absolute floors.
+    Returns (daily_kcal, protein_g), or None when automated targets are disabled
+    (eating-disorder history) — the coach then supports training only.
+    Constants are clinician-calibration placeholders, same status as the floors."""
+    if "eating_disorder_history" in profile.medical_flags:
+        return None
+
+    age = max(14, date.today().year - profile.birth_year)
+    base = 10 * current_weight_kg + 6.25 * profile.height_cm - 5 * age
+    sex_term = {"male": 5, "female": -161}.get(profile.sex.value, -78)
+    tdee = (base + sex_term) * ACTIVITY_MULTIPLIER.get(profile.activity_level.value, 1.4)
+
+    rate = min(max(profile.weekly_rate_kg, 0.0), MAX_SAFE_WEEKLY_RATE_KG)
+    target = round(tdee - rate * KCAL_PER_KG / 7)
+
+    floor = ABSOLUTE_KCAL_FLOOR.get(profile.sex.value, 1200)
+    target = max(int(target), floor)
+
+    protein = int(round(1.6 * profile.goal_weight_kg / 5) * 5)
+    protein = max(MIN_PROTEIN_G, min(protein, MAX_PROTEIN_G))
+    return target, protein

@@ -30,6 +30,7 @@ class CatalogVariantIndex:
         self._equipment = {e["id"]: e["equipment"] for e in exercises}
         self._images = {e["id"]: e.get("image_urls", []) for e in exercises}
         self._cues = {e["id"]: e.get("cues", []) for e in exercises}
+        self._all = exercises
         self._group_for: dict[str, dict] = {}
         for g in variant_groups:
             for ids in g["by_equipment"].values():
@@ -48,6 +49,23 @@ class CatalogVariantIndex:
 
     def equipment_of(self, exercise_id: str) -> str:
         return self._equipment.get(exercise_id, "other")
+
+    def search(self, q: str | None = None, equipment: str | None = None, limit: int = 30) -> list[dict]:
+        """Compact rows for the program-builder picker."""
+        ql = q.lower().strip() if q else None
+        out: list[dict] = []
+        for e in self._all:
+            if equipment and e["equipment"] != equipment:
+                continue
+            if ql and ql not in e["name"].lower() and ql not in e.get("base_movement", ""):
+                continue
+            out.append({
+                "exercise_id": e["id"], "name": e["name"], "equipment": e["equipment"],
+                "primary_muscles": e.get("primary_muscles", []),
+            })
+            if len(out) >= limit:
+                break
+        return out
 
     def detail_of(self, exercise_id: str) -> dict:
         """Media + coaching cues for the UI."""

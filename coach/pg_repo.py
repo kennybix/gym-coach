@@ -427,3 +427,48 @@ class PostgresCoachRepo:
              "protein_g": float(r["protein_g"]) if r["protein_g"] is not None else None}
             for r in rows
         ]
+
+    # --- onboarding ------------------------------------------------------------
+    async def create_profile(self, user_id: str, *, sex: str, birth_year: int,
+                             height_cm: float, activity_level: str, goal_weight_kg: float,
+                             weekly_rate_kg: float, medical_flags: list[str]) -> None:
+        await self._pool.execute(
+            """
+            insert into profiles (user_id, sex, birth_year, height_cm, activity_level,
+                                  goal_weight_kg, weekly_rate_kg, medical_flags)
+            values ($1::uuid, $2, $3, $4, $5, $6, $7, $8::jsonb)
+            on conflict (user_id) do update set
+                sex = excluded.sex, birth_year = excluded.birth_year,
+                height_cm = excluded.height_cm, activity_level = excluded.activity_level,
+                goal_weight_kg = excluded.goal_weight_kg,
+                weekly_rate_kg = excluded.weekly_rate_kg,
+                medical_flags = excluded.medical_flags
+            """,
+            user_id, sex, birth_year, height_cm, activity_level,
+            goal_weight_kg, weekly_rate_kg, json.dumps(medical_flags),
+        )
+
+    async def create_program(self, user_id: str, name: str, sessions_per_week: int,
+                             exercises: list[dict]) -> str:
+        """Replaces the active program (old ones are kept inactive for history)."""
+        async with self._pool.acquire() as con:
+            async with con.transaction():
+                await con.execute(
+                    "update programs set is_active = false where user_id = $1::uuid",
+                    user_id,
+                )
+                pid = await con.fetchval(
+                    """insert into programs (user_id, name, sessions_per_week, is_active)
+                       values ($1::uuid, $2, $3, true) returning program_id""",
+                    user_id, name, sessions_per_week,
+                )
+                for i, e in enumerate(exercises):
+                    await con.execute(
+                        """insert into program_exercises (program_id, exercise_id, position, sets, reps)
+                           values ($1, $2, $3, $4, $5)""",
+                        pid, e["exercise_id"], i, e["sets"], e["reps"],
+                    )
+        return str(pid)
+
+    def search_catalog(self, q=None, equipment=None, limit: int = 30) -> list[dict]:
+        return self._catalog.search(q=q, equipment=equipment, limit=limit)
