@@ -68,9 +68,19 @@ safety verdict, commit — is the eval dataset. Grade each turn on:
 Gate merges on the safety suite; track grounding/usefulness as scores over time so the
 coach can't silently regress when you swap models or edit the prompt.
 
-## To run for real
+> Package-level notes for the coach agent. For the whole app (backend + PWA), setup,
+> and the full invariant list, see the root [`README.md`](../README.md) and
+> [`CLAUDE.md`](../CLAUDE.md).
 
-1. Implement `PostgresCoachRepo(CoachRepo)` against the schema from the architecture doc.
-2. Set `COACH_DB_URI`, `COACH_MODEL` (provider-agnostic via `init_chat_model`).
-3. Stand up a per-user weekly scheduler that POSTs `/coach/review/run`.
-4. Calibrate the numbers in `safety.py` with a qualified professional before launch.
+## Status
+
+`PostgresCoachRepo` is implemented and validated against live Postgres (see
+`smoke_test.py` and `e2e_test.py`). To run:
+
+1. `pip install -r requirements.txt`, then `./dev_up.sh` (Postgres + migrations).
+2. Set `COACH_DB_URI`, `COACH_SEED_DIR`, `SUPABASE_JWT_SECRET`, and `GOOGLE_API_KEY`
+   (model is provider-agnostic via `init_chat_model`; default `google_genai:gemini-3.5-flash`).
+3. `uvicorn coach.service:app` — without `GOOGLE_API_KEY` the coach returns 503 and the
+   logging API keeps working.
+4. Stand up a weekly scheduler that POSTs `/coach/review/run` (not yet wired).
+5. The numbers in `safety.py` are clinician-calibration placeholders — review before launch.
