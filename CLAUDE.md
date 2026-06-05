@@ -115,19 +115,25 @@ This is a health-adjacent product. These are deliberate and must be preserved:
 
 ## Current status
 
-Validated as far as a headless environment allows: data layer (smoke + e2e vs live PG),
-full test suite green, every REST endpoint live-tested, both onboarding paths, all five
-screens build + serve.
+**Live and running** on this machine (`quantoptimus`) as systemd user services, served to
+the user's Android phone over Tailscale at `https://quantoptimus.taile8b1de.ts.net`
+(tailnet-only HTTPS). Coach runs on **GPT-5.5 via the local CLI proxy**; embeddings via a
+**LiteLLM→Ollama** gateway; RAG corpus populated (~257 chunks). Restart-resilient
+(`Restart=always`, linger on). Full test suite green.
 
-**Needs real-world verification (do these first on desktop):**
-1. One real Gemini round-trip through `/coach/chat` to confirm the provider's tool-calling
-   drives propose→safety→commit (only a scripted model has exercised that path).
-2. A phone/browser pass on the PWA (esp. iOS service-worker + install behavior).
+**Read [`docs/SYSTEM_OVERVIEW.md`](docs/SYSTEM_OVERVIEW.md) first** — it documents the whole
+running system (architecture, ports, services, LLM wiring, phone access, operations) for the
+next human/agent. Then [`deploy/README.md`](deploy/README.md) and
+[`deploy/PHONE_ACCESS.md`](deploy/PHONE_ACCESS.md).
 
-**Not yet done:** deployment hardening (CORS is pinned to localhost in `service.py`;
-no HTTPS/systemd/backups), the weekly-review scheduler (a cron hitting
-`/coach/review/run`), and the RAG corpus is empty (pipeline exists; ingesting vetted,
-openly-licensed content is real work).
+**Built since the original baseline:** food-database nutrition logging (Open Food Facts +
+barcode + servings/recent), vitals (BP/HR), proactive coach insights, workout history,
+program editor, in-place set/weight/nutrition editing, weekly-review scheduler (systemd
+timer), nightly DB backup, data export, UI redesign, the Tailscale phone deploy.
+
+**Open before a real launch:** a **clinician signs** [`deploy/SAFETY_REVIEW.md`](deploy/SAFETY_REVIEW.md);
+always-on availability (app is up only while this machine is awake — the always-on path is
+the droplet+domain version keeping the LLM here over Tailscale); device sync (Apple Health).
 
 ## Gotchas
 

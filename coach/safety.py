@@ -26,11 +26,27 @@ from pydantic import BaseModel
 
 from .models import Profile, ProposedProgramChange, ProposedTargetChange, SafetyVerdict
 
-# --- tunable guardrail constants (clinician-calibrated placeholders) ----------
+# --- guardrail constants --------------------------------------------------------
+# These are evidence-ALIGNED defaults, not a clinician's sign-off. Each is referenced to
+# published general-population guidance below; a qualified clinician must still review and
+# confirm them for the intended user before any launch (see deploy/SAFETY_REVIEW.md).
+# NOT individualized medical advice — they are conservative population-level floors/caps.
+#
+#   ABSOLUTE_KCAL_FLOOR — widely-cited public guidance: intake should not fall below
+#     ~1200 kcal/day for women or ~1500 kcal/day for men except under professional
+#     supervision; very-low-calorie diets (<800 kcal) are medical-supervision-only.
+#     (Refs: NHS "Very low calorie diets"; Harvard Health; cf. CDC Healthy Weight.)
+#   MAX_SAFE_WEEKLY_RATE_KG — CDC & NHS: a gradual ~0.5–1 kg (1–2 lb) per week is the
+#     sustainable, evidence-backed rate; faster risks muscle/nutrient loss, gallstones.
+#     Capped at the 1.0 kg/week upper bound. (Refs: CDC "Steps for Losing Weight"; NHS.)
+#   CONFIRM_CUT_BAND / REJECT_STEP_CUT_BAND — conservative single-step heuristics (not a
+#     published number): a >15% cut needs explicit confirmation; a >25% single-step cut is
+#     rejected in favour of gradual adjustment. Tune with the reviewing clinician.
+#   MIN/MAX_PROTEIN_G — plausibility bounds, not a recommendation.
 ABSOLUTE_KCAL_FLOOR = {"male": 1500, "female": 1200, "other": 1200}
 CONFIRM_CUT_BAND = 0.85       # cut to <85% of current target -> require explicit confirmation
 REJECT_STEP_CUT_BAND = 0.75   # cut to <75% in a single step -> reject (too aggressive at once)
-MAX_SAFE_WEEKLY_RATE_KG = 1.0 # cap on the goal loss rate set at onboarding
+MAX_SAFE_WEEKLY_RATE_KG = 1.0 # cap on the goal loss rate (CDC/NHS upper bound)
 MIN_PROTEIN_G, MAX_PROTEIN_G = 0, 400
 
 
@@ -121,12 +137,38 @@ _TRAIN_THROUGH_INJURY = (
     "train through the pain", "work out with my injury", "ignore the injury",
     "push through the injury",
 )
-_EXTREME_DEFICIT = ("starve", "skip all meals", "stop eating")
+_EXTREME_DEFICIT = ("starve", "skip all meals", "stop eating", "crash diet", "vlcd")
 
 # rapid-loss promise, e.g. "lose 10 lbs in a week"
 _RAPID_LOSS = re.compile(
     r"lose\s+(\d+)\s*(lbs?|pounds?|kgs?|kilograms?)\s+in\s+(a|one|1|the\s+next)\s*(day|week)",
     re.IGNORECASE,
+)
+
+# Very-low daily calorie INTAKE, below the absolute floor — two framings:
+#   "<n> calories a day"           and   "eat/consume/limit to <n> calories"
+# Flag only when n is below this threshold (kept at the lowest floor). Used INBOUND only;
+# the coach quotes low numbers when *refusing* them, so the outbound guard must not match.
+LOW_KCAL_INTAKE_THRESHOLD = 1200
+_KCAL_PER_DAY = re.compile(
+    r"(\d{3,4})\s*(?:k?cals?|kcal|calories?)\s*(?:a|per|/|each)\s*day", re.IGNORECASE
+)
+_KCAL_INTAKE_CUE = re.compile(
+    r"(?:eat|eating|ate|consume|consuming|survive on|surviving on|live on|living on|"
+    r"only|just|restrict\w*\s+to|limit\w*\s+to|down to|net|intake of)\D{0,20}"
+    r"(\d{3,4})\s*(?:k?cals?|kcal|calories?)",
+    re.IGNORECASE,
+)
+
+# Rapid-loss INTENT without a number: a loss cue AND a speed cue both present.
+_LOSS_CUE = (
+    "lose weight", "losing weight", "lose fat", "losing fat", "weight loss",
+    "fat loss", "drop weight", "shed weight", "slim down", "lose as much",
+)
+_SPEED_CUE = (
+    "as fast as possible", "as quickly as possible", "as fast as i can",
+    "as fast as i possibly", "asap", "fastest way", "fastest possible",
+    "super fast", "really fast", "extremely fast", "as rapidly as", "rapidly",
 )
 
 
@@ -144,6 +186,20 @@ def _is_rapid_loss(text: str) -> bool:
     return n > per_week_threshold
 
 
+def _is_low_kcal_intake(text: str) -> bool:
+    """True if the message states a daily calorie INTAKE below the floor."""
+    for rx in (_KCAL_PER_DAY, _KCAL_INTAKE_CUE):
+        for m in rx.finditer(text):
+            if int(m.group(1)) < LOW_KCAL_INTAKE_THRESHOLD:
+                return True
+    return False
+
+
+def _is_rapid_loss_intent(text: str) -> bool:
+    t = text.lower()
+    return any(c in t for c in _LOSS_CUE) and any(c in t for c in _SPEED_CUE)
+
+
 def screen_user_message(text: str) -> ScreenResult:
     if _contains(text, _SELF_HARM):
         return ScreenResult(
@@ -157,7 +213,12 @@ def screen_user_message(text: str) -> ScreenResult:
             posture="Do NOT provide numbers, meal plans, or restriction advice. Validate the "
                     "feeling, do less rather than more, and keep the path to specialized support open.",
         )
-    if _is_rapid_loss(text) or _contains(text, _EXTREME_DEFICIT):
+    if (
+        _is_rapid_loss(text)
+        or _is_low_kcal_intake(text)
+        or _is_rapid_loss_intent(text)
+        or _contains(text, _EXTREME_DEFICIT)
+    ):
         return ScreenResult(
             flagged=True, category="extreme_deficit",
             posture="Decline the unsafe framing; explain sustainable pace without prescribing aggressive numbers.",

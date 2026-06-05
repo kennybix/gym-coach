@@ -8,9 +8,12 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException
+from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
@@ -21,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import api as rest_api
 from .auth import get_current_user_id
 from .graph import build_coach_graph
+from .insight import generate_insight
 from .review import build_review_graph
 from .pg_repo import PostgresCoachRepo
 
@@ -41,10 +45,12 @@ async def lifespan(app: FastAPI):
         try:
             _state["chat"] = build_coach_graph(repo, checkpointer=saver, model_id=MODEL_ID)
             _state["review"] = build_review_graph(repo, model_id=MODEL_ID)
+            _state["insight_model"] = init_chat_model(MODEL_ID, temperature=0.3)
         except Exception as exc:  # missing provider pkg/key must not kill the logging API
             logging.warning("coach graphs unavailable (LLM not configured): %s", exc)
             _state["chat"] = None
             _state["review"] = None
+            _state["insight_model"] = None
         try:
             yield
         finally:
@@ -53,9 +59,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(rest_api.router)
-app.add_middleware(  # PWA dev origin; tighten for deployment
+from .rag.service import router as rag_router  # noqa: E402 — after app config
+app.include_router(rag_router)
+# PWA origins; tighten for deployment. Override via COACH_CORS_ORIGINS (comma-separated).
+_cors_origins = [
+    o.strip()
+    for o in os.environ.get("COACH_CORS_ORIGINS", "http://localhost:3000").split(",")
+    if o.strip()
+]
+app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -118,3 +132,29 @@ async def run_review(body: ReviewIn, user_id: str = Depends(get_current_user_id)
         {"user_id": user_id, "window_days": body.window_days, "committed_changes": {}}
     )
     return {"status": "ok", "assessment": out["assessment"], "changes": out["committed_changes"]}
+
+
+# Proactive "here's what I noticed" note for the Today screen. Cached per user with a short
+# TTL so it isn't regenerated on every open (in-memory: fine for this single-host app).
+_insight_cache: dict = {}
+_INSIGHT_TTL = 6 * 3600
+
+
+@app.get("/coach/insight")
+async def coach_insight(
+    refresh: bool = False,
+    focus: str = "auto",
+    user_id: str = Depends(get_current_user_id),
+):
+    model = _state.get("insight_model")
+    if model is None:
+        raise HTTPException(503, "coach unavailable: LLM provider not configured")
+    key = (user_id, focus)
+    cached = _insight_cache.get(key)
+    now = time.time()
+    if cached and not refresh and now - cached["ts"] < _INSIGHT_TTL:
+        return {"note": cached["note"], "generated_at": cached["iso"], "focus": focus, "cached": True}
+    note = await generate_insight(_state["repo"], model, user_id, focus=focus)
+    iso = datetime.now(timezone.utc).isoformat()
+    _insight_cache[key] = {"note": note, "ts": now, "iso": iso}
+    return {"note": note, "generated_at": iso, "focus": focus, "cached": False}

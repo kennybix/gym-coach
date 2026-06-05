@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiGet, apiPost } from "@/lib/api";
+import NumField from "./NumField";
 
 type Step = 0 | 1 | 2 | 3 | 4;
 type CatalogRow = { exercise_id: string; name: string; equipment: string; primary_muscles: string[] };
@@ -15,6 +16,7 @@ type Picked = CatalogRow & { sets: number; reps: number };
 
 const RATE_OPTIONS = [0.25, 0.5, 0.75, 1.0]; // kg/week — capped list by design
 const EQUIPMENT = ["", "none", "dumbbell", "barbell", "kettlebell", "band", "cable", "machine"];
+const STEP_TITLES = ["About you", "Your goal", "Screening", "Your program", "Ready"];
 
 export default function OnboardingFlow() {
   const router = useRouter();
@@ -29,6 +31,11 @@ export default function OnboardingFlow() {
   // goal
   const [goalKg, setGoalKg] = useState(78);
   const [rate, setRate] = useState(0.5);
+  // baseline vitals (optional)
+  const [addVitals, setAddVitals] = useState(false);
+  const [bSys, setBSys] = useState(120);
+  const [bDia, setBDia] = useState(80);
+  const [bHr, setBHr] = useState(70);
   // screening
   const [injury, setInjury] = useState(false);
   const [edHistory, setEdHistory] = useState(false);
@@ -75,6 +82,15 @@ export default function OnboardingFlow() {
         name: "Main", sessions_per_week: perWeek,
         exercises: picked.map((p) => ({ exercise_id: p.exercise_id, sets: p.sets, reps: p.reps })),
       });
+      if (addVitals) {
+        // best-effort: a vitals hiccup shouldn't fail an otherwise-complete onboarding
+        try {
+          await apiPost("/api/vitals", {
+            id: crypto.randomUUID(), recorded_at: new Date().toISOString(),
+            systolic: bSys, diastolic: bDia, heart_rate: bHr, tag: "baseline",
+          });
+        } catch { /* ignore */ }
+      }
       setDone(ob);
       setStep(4);
     } catch {
@@ -87,38 +103,58 @@ export default function OnboardingFlow() {
   const canNext = useMemo(() => (step === 3 ? picked.length > 0 : true), [step, picked]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <header className="rise">
-        <p className="font-display text-[11px] tracking-[0.3em] text-dim">FIRST RUN · {step + 1}/5</p>
-        <h1 className="font-display text-3xl font-semibold mt-1">
-          {["ABOUT YOU", "YOUR GOAL", "SCREENING", "YOUR PROGRAM", "READY"][step]}
-        </h1>
+        <p className="eyebrow">First run · {step + 1} of 5</p>
+        <h1 className="font-display text-[28px] font-bold mt-1.5">{STEP_TITLES[step]}</h1>
+        <div className="flex gap-1.5 mt-3">
+          {STEP_TITLES.map((_, i) => (
+            <span key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i <= step ? "bg-volt" : "bg-line"}`} />
+          ))}
+        </div>
       </header>
 
       {step === 0 && (
         <Card>
-          <Choice label="sex" value={sex} options={["male", "female", "other"]} onPick={(v) => setSex(v as typeof sex)} />
-          <Num label="birth year" value={birthYear} step={1} onChange={setBirthYear} />
-          <Num label="height" unit="cm" value={heightCm} step={1} onChange={setHeightCm} />
-          <Choice label="activity" value={activity} options={["sedentary", "light", "moderate", "active"]} onPick={setActivity} />
-          <Num label="current weight" unit="kg" value={currentKg} step={0.5} onChange={setCurrentKg} />
+          <Choice label="Sex" value={sex} options={["male", "female", "other"]} onPick={(v) => setSex(v as typeof sex)} />
+          <Num label="Birth year" value={birthYear} step={1} onChange={setBirthYear} />
+          <Num label="Height" unit="cm" value={heightCm} step={1} onChange={setHeightCm} />
+          <Choice label="Activity" value={activity} options={["sedentary", "light", "moderate", "active"]} onPick={setActivity} />
+          <Num label="Current weight" unit="kg" value={currentKg} step={0.5} onChange={setCurrentKg} />
+
+          <Toggle
+            label="Add a baseline reading (optional)"
+            sub="Log today's blood pressure and heart rate so your trends start from day one."
+            on={addVitals}
+            onToggle={() => setAddVitals((v) => !v)}
+          />
+          {addVitals && (
+            <div className="space-y-2.5">
+              <p className="text-dim text-xs">Blood pressure</p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1"><NumField value={bSys} onChange={setBSys} step={1} min={50} max={260} unit="sys" compact /></div>
+                <span className="text-dim text-lg">/</span>
+                <div className="flex-1"><NumField value={bDia} onChange={setBDia} step={1} min={30} max={160} unit="dia" compact /></div>
+              </div>
+              <NumField label="Heart rate" value={bHr} onChange={setBHr} step={1} min={30} max={230} unit="bpm" />
+            </div>
+          )}
         </Card>
       )}
 
       {step === 1 && (
         <Card>
-          <Num label="goal weight" unit="kg" value={goalKg} step={0.5} onChange={setGoalKg} />
-          <div className="mt-3">
-            <p className="text-dim text-xs mb-2">weekly pace (sustainable beats fast)</p>
+          <Num label="Goal weight" unit="kg" value={goalKg} step={0.5} onChange={setGoalKg} />
+          <div>
+            <p className="text-dim text-xs mb-2">Weekly pace (sustainable beats fast)</p>
             <div className="grid grid-cols-4 gap-2">
               {RATE_OPTIONS.map((r) => (
-                <button key={r} onClick={() => setRate(r)}
-                  className={`h-11 font-display tnum text-sm border ${rate === r ? "bg-volt text-ink border-volt font-semibold" : "border-line text-bone/80"}`}>
+                <button key={r} data-on={rate === r} onClick={() => setRate(r)} className="seg h-11 tnum text-sm">
                   {r}
                 </button>
               ))}
             </div>
-            <p className="text-dim/70 text-xs mt-2">kg per week · your coach adjusts pace from your real data</p>
+            <p className="text-dim text-xs mt-2.5">kg per week · your coach adjusts pace from your real data</p>
           </div>
         </Card>
       )}
@@ -130,13 +166,12 @@ export default function OnboardingFlow() {
             sub="The coach won't intensify your program until it's cleared."
             on={injury} onToggle={() => setInjury((v) => !v)}
           />
-          <div className="h-3" />
           <Toggle
             label="I have a history of disordered eating"
             sub="If so, automated calorie targets stay off — the app focuses on training, and nutrition guidance belongs with specialized professionals."
             on={edHistory} onToggle={() => setEdHistory((v) => !v)}
           />
-          <p className="text-dim/70 text-xs mt-4 leading-relaxed">
+          <p className="text-dim text-xs leading-relaxed">
             These only tune safety behavior. They&apos;re stored in your own database and shown to no one.
           </p>
         </Card>
@@ -144,39 +179,44 @@ export default function OnboardingFlow() {
 
       {step === 3 && (
         <Card>
-          <Num label="sessions / week" value={perWeek} step={1} onChange={(v) => setPerWeek(Math.min(7, Math.max(1, v)))} />
-          <div className="flex gap-2 mt-3">
-            <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()}
-              placeholder="search exercises" className="flex-1 h-11 bg-panel2 border border-line px-3 text-sm outline-none focus:border-volt" />
-            <button onClick={search} className="px-4 bg-volt text-ink font-display text-sm font-semibold tracking-wider active:bg-voltdim">GO</button>
+          <Num label="Sessions / week" value={perWeek} step={1} onChange={(v) => setPerWeek(Math.min(7, Math.max(1, v)))} />
+          <div className="flex gap-2">
+            <input
+              value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()}
+              placeholder="Search exercises" className="field flex-1 h-11 px-3.5 text-sm outline-none"
+              autoCapitalize="off" autoCorrect="off"
+            />
+            <button onClick={search} className="btn btn-primary px-5 text-sm">Go</button>
           </div>
-          <div className="flex gap-1.5 mt-2 flex-wrap">
+          <div className="flex gap-1.5 flex-wrap">
             {EQUIPMENT.map((e) => (
-              <button key={e || "all"} onClick={() => setEquip(e)}
-                className={`px-2.5 py-1 text-[10px] font-display tracking-widest border ${equip === e ? "border-volt text-volt" : "border-line text-dim"}`}>
-                {(e || "all").toUpperCase()}
+              <button
+                key={e || "all"} onClick={() => setEquip(e)}
+                className={`chip px-3 py-1.5 text-xs capitalize ${equip === e ? "border-volt text-volt bg-volt/10" : "text-dim"}`}
+              >
+                {e || "all"}
               </button>
             ))}
           </div>
-          <div className="mt-3 max-h-44 overflow-y-auto divide-y divide-line border border-line">
+          <div className="rounded-xl border border-line divide-y divide-line max-h-44 overflow-y-auto scroll-soft">
             {results.map((r) => (
-              <button key={r.exercise_id} onClick={() => add(r)} className="w-full text-left px-3 py-2.5 active:bg-panel2">
+              <button key={r.exercise_id} onClick={() => add(r)} className="w-full text-left px-3.5 py-2.5 active:bg-panel2">
                 <span className="text-sm text-bone/90">{r.name}</span>
-                <span className="text-dim text-xs ml-2">{r.equipment}</span>
+                <span className="text-dim text-xs ml-2 capitalize">{r.equipment}</span>
               </button>
             ))}
-            {results.length === 0 && <p className="text-dim text-xs p-3">no matches — try another search</p>}
+            {results.length === 0 && <p className="text-dim text-xs p-3.5">No matches — try another search.</p>}
           </div>
           {picked.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <p className="font-display text-[11px] tracking-[0.25em] text-dim">YOUR PROGRAM · {picked.length}</p>
+            <div className="space-y-2">
+              <p className="eyebrow">Your program · {picked.length}</p>
               {picked.map((p) => (
-                <div key={p.exercise_id} className="border border-line bg-panel2 px-3 py-2 flex items-center gap-2">
+                <div key={p.exercise_id} className="field px-3.5 py-2.5 flex items-center gap-2">
                   <span className="flex-1 text-sm truncate">{p.name}</span>
                   <Mini value={p.sets} onDown={() => tweak(p.exercise_id, "sets", -1)} onUp={() => tweak(p.exercise_id, "sets", 1)} />
                   <span className="text-dim text-xs">×</span>
                   <Mini value={p.reps} onDown={() => tweak(p.exercise_id, "reps", -1)} onUp={() => tweak(p.exercise_id, "reps", 1)} />
-                  <button onClick={() => remove(p.exercise_id)} className="text-alert text-lg px-1">×</button>
+                  <button onClick={() => remove(p.exercise_id)} className="text-alert text-xl px-1 leading-none">×</button>
                 </div>
               ))}
             </div>
@@ -190,18 +230,18 @@ export default function OnboardingFlow() {
             <p className="text-sm text-bone/90 leading-relaxed">{done.note}</p>
           ) : (
             <>
-              <p className="font-display text-[11px] tracking-[0.25em] text-dim mb-2">STARTING POINT</p>
-              <p className="tnum text-bone/90 text-sm">
+              <p className="eyebrow mb-2">Starting point</p>
+              <p className="tnum text-bone font-display text-xl font-semibold">
                 {done.target?.daily_kcal} kcal · {done.target?.protein_g} g protein
               </p>
-              <p className="text-dim/80 text-xs mt-2 leading-relaxed">
+              <p className="text-dim text-xs mt-2.5 leading-relaxed">
                 A conservative estimate, nothing more — your coach adjusts it from what you actually log.
                 {done.rate_capped && " (Your pace was set to the safe maximum.)"}
               </p>
             </>
           )}
-          <button onClick={() => router.push("/")} className="mt-4 w-full h-12 bg-volt text-ink font-display font-semibold tracking-[0.2em] active:bg-voltdim">
-            GO TO TODAY
+          <button onClick={() => router.push("/")} className="btn btn-primary w-full h-12 mt-4">
+            Go to Today
           </button>
         </Card>
       )}
@@ -209,18 +249,18 @@ export default function OnboardingFlow() {
       {error && <p className="text-alert text-xs px-1">{error}</p>}
 
       {step < 4 && (
-        <div className="flex gap-2">
+        <div className="flex gap-2.5">
           {step > 0 && (
-            <button onClick={() => setStep((s) => (s - 1) as Step)} className="h-12 px-5 border border-line text-bone font-display tracking-widest active:bg-panel">
-              BACK
+            <button onClick={() => setStep((s) => (s - 1) as Step)} className="btn btn-ghost h-12 px-6">
+              Back
             </button>
           )}
           <button
             disabled={!canNext || busy}
             onClick={() => (step === 3 ? submit() : setStep((s) => (s + 1) as Step))}
-            className="flex-1 h-12 bg-volt text-ink font-display font-semibold tracking-[0.2em] active:bg-voltdim disabled:opacity-40"
+            className="btn btn-primary flex-1 h-12"
           >
-            {step === 3 ? (busy ? "SAVING…" : "FINISH") : "NEXT"}
+            {step === 3 ? (busy ? "Saving…" : "Finish") : "Next"}
           </button>
         </div>
       )}
@@ -230,17 +270,16 @@ export default function OnboardingFlow() {
 
 /* ------- small local pieces ------- */
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="bg-panel border border-line rule-volt p-4 rise space-y-3">{children}</div>;
+  return <div className="card p-5 rise space-y-4">{children}</div>;
 }
 function Choice({ label, value, options, onPick }: { label: string; value: string; options: string[]; onPick: (v: string) => void }) {
   return (
     <div>
-      <p className="text-dim text-xs mb-1.5">{label}</p>
-      <div className={`grid grid-cols-${Math.min(options.length, 4)} gap-2`} style={{ gridTemplateColumns: `repeat(${Math.min(options.length, 4)}, minmax(0,1fr))` }}>
+      <p className="text-dim text-xs mb-2">{label}</p>
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(options.length, 4)}, minmax(0,1fr))` }}>
         {options.map((o) => (
-          <button key={o} onClick={() => onPick(o)}
-            className={`h-11 text-xs font-display tracking-wider border ${value === o ? "bg-volt text-ink border-volt font-semibold" : "border-line text-bone/80"}`}>
-            {o.toUpperCase()}
+          <button key={o} data-on={value === o} onClick={() => onPick(o)} className="seg h-11 text-xs capitalize">
+            {o}
           </button>
         ))}
       </div>
@@ -250,21 +289,21 @@ function Choice({ label, value, options, onPick }: { label: string; value: strin
 function Num({ label, unit, value, step, onChange }: { label: string; unit?: string; value: number; step: number; onChange: (v: number) => void }) {
   return (
     <div>
-      <p className="text-dim text-xs mb-1.5">{label}</p>
-      <div className="flex items-center border border-line bg-panel2">
-        <button className="w-11 h-12 text-2xl text-dim active:text-volt" onClick={() => onChange(+(value - step).toFixed(1))}>−</button>
+      <p className="text-dim text-xs mb-2">{label}</p>
+      <div className="field flex items-center">
+        <button className="w-11 h-12 text-2xl text-dim active:text-volt rounded-l-[0.9rem]" onClick={() => onChange(+(value - step).toFixed(1))}>−</button>
         <div className="flex-1 text-center">
-          <span className="font-display tnum text-xl font-semibold">{value}</span>
+          <span className="font-display tnum text-xl font-bold">{value}</span>
           {unit && <span className="text-dim text-xs ml-1">{unit}</span>}
         </div>
-        <button className="w-11 h-12 text-2xl text-dim active:text-volt" onClick={() => onChange(+(value + step).toFixed(1))}>+</button>
+        <button className="w-11 h-12 text-2xl text-dim active:text-volt rounded-r-[0.9rem]" onClick={() => onChange(+(value + step).toFixed(1))}>+</button>
       </div>
     </div>
   );
 }
 function Mini({ value, onDown, onUp }: { value: number; onDown: () => void; onUp: () => void }) {
   return (
-    <span className="flex items-center border border-line">
+    <span className="flex items-center rounded-lg border border-line bg-ink/40">
       <button onClick={onDown} className="w-7 h-8 text-dim active:text-volt">−</button>
       <span className="tnum text-sm w-6 text-center">{value}</span>
       <button onClick={onUp} className="w-7 h-8 text-dim active:text-volt">+</button>
@@ -273,10 +312,14 @@ function Mini({ value, onDown, onUp }: { value: number; onDown: () => void; onUp
 }
 function Toggle({ label, sub, on, onToggle }: { label: string; sub: string; on: boolean; onToggle: () => void }) {
   return (
-    <button onClick={onToggle} className="w-full text-left border border-line bg-panel2 p-3 flex items-start gap-3 active:border-volt/50">
-      <span className={`mt-0.5 w-5 h-5 shrink-0 border ${on ? "bg-volt border-volt" : "border-line"}`} />
+    <button onClick={onToggle} className={`w-full text-left field p-4 flex items-start gap-3 transition-colors ${on ? "border-volt/60" : ""}`}>
+      <span className={`mt-0.5 w-5 h-5 shrink-0 rounded-md border flex items-center justify-center ${on ? "bg-volt border-volt" : "border-line"}`}>
+        {on && (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg>
+        )}
+      </span>
       <span>
-        <span className="block text-sm text-bone/90">{label}</span>
+        <span className="block text-sm text-bone/90 font-medium">{label}</span>
         <span className="block text-dim text-xs mt-1 leading-relaxed">{sub}</span>
       </span>
     </button>

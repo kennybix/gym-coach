@@ -1,5 +1,7 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import ExportData from "@/components/ExportData";
 
 export default function SettingsPage() {
   const [base, setBase] = useState("");
@@ -7,7 +9,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setBase(localStorage.getItem("coach_api_base") || "http://localhost:8000");
+    setBase(localStorage.getItem("coach_api_base") || "");
     setTok(localStorage.getItem("coach_token") || "");
   }, []);
 
@@ -19,38 +21,61 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <h1 className="font-display text-3xl font-semibold rise">SET-UP</h1>
-      <div className="bg-panel border border-line rule-volt p-4 space-y-4 rise" style={{ animationDelay: "80ms" }}>
+    <div className="space-y-5">
+      <h1 className="font-display text-[28px] font-bold rise">Setup</h1>
+
+      <Link href="/program" className="card p-4 rise flex items-center justify-between active:bg-panel2">
+        <span>
+          <span className="block text-sm font-medium">Edit program</span>
+          <span className="block text-dim text-xs mt-0.5">Add, reorder, or retarget your exercises</span>
+        </span>
+        <span className="text-dim text-xl">›</span>
+      </Link>
+
+      <Link href="/history" className="card p-4 rise flex items-center justify-between active:bg-panel2">
+        <span>
+          <span className="block text-sm font-medium">Workout history</span>
+          <span className="block text-dim text-xs mt-0.5">Browse past sessions and fix their logs</span>
+        </span>
+        <span className="text-dim text-xl">›</span>
+      </Link>
+
+      <div className="card p-5 space-y-5 rise">
         <label className="block">
-          <span className="font-display text-[11px] tracking-[0.2em] text-dim">API BASE URL</span>
+          <span className="eyebrow">API base URL <span className="text-dim normal-case tracking-normal">· optional</span></span>
           <input
             value={base}
             onChange={(e) => setBase(e.target.value)}
-            className="mt-1.5 w-full h-12 bg-panel2 border border-line px-3 text-sm tnum outline-none focus:border-volt"
-            placeholder="https://your-vps:8000"
+            className="field mt-2 w-full h-12 px-3.5 text-sm tnum outline-none"
+            placeholder="Automatic — leave blank to use this site"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
           />
         </label>
         <label className="block">
-          <span className="font-display text-[11px] tracking-[0.2em] text-dim">BEARER TOKEN</span>
+          <span className="eyebrow">Bearer token</span>
           <textarea
             value={tok}
             onChange={(e) => setTok(e.target.value)}
             rows={4}
-            className="mt-1.5 w-full bg-panel2 border border-line p-3 text-xs tnum outline-none focus:border-volt break-all"
+            className="field mt-2 w-full p-3.5 text-xs tnum outline-none break-all resize-none"
             placeholder="paste your JWT"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
           />
         </label>
-        <button
-          onClick={save}
-          className="w-full h-12 bg-volt text-ink font-display font-semibold tracking-[0.2em] active:bg-voltdim"
-        >
-          {saved ? "SAVED" : "SAVE"}
+        <button onClick={save} className="btn btn-primary w-full h-12">
+          {saved ? "Saved ✓" : "Save"}
         </button>
       </div>
+
+      <ExportData />
+
       <p className="text-dim text-xs leading-relaxed px-1">
-        Single-user app: the token is a JWT signed with your server&apos;s secret. Mint one with
-        the dev script in the repo, paste it here once, and install this page to your home screen.
+        Single-user app: the token is a JWT signed with your server&apos;s secret. Mint one with the
+        dev script in the repo, paste it here once, and install this page to your home screen.
       </p>
     </div>
   );

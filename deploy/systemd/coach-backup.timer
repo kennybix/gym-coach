@@ -1,0 +1,10 @@
+[Unit]
+Description=Gym Coach — nightly Postgres backup schedule (02:30)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+Unit=coach-backup.service
+
+[Install]
+WantedBy=timers.target

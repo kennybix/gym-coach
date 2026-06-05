@@ -1,0 +1,39 @@
+# LiteLLM gateway — unified OpenAI-compatible API for gym-coach (and friends).
+#
+# Why: CLIProxyAPI serves chat from your subscriptions but has NO embeddings route.
+# LiteLLM fills that gap: it exposes /v1/embeddings backed by your LOCAL Ollama
+# (free, unlimited, private), and can also pass chat through to CLIProxyAPI so one
+# endpoint (:4000) serves both.
+#
+# Run:  litellm --config config.yaml --port 4000   (env: LITELLM_MASTER_KEY, CLI_PROXY_API_KEY)
+
+model_list:
+  # ---- embeddings: LOCAL Ollama (free, 1024-dim) — the default for RAG ----
+  - model_name: embed-default
+    litellm_params:
+      model: ollama/mxbai-embed-large
+      api_base: http://localhost:11434
+
+  # ---- chat: pass through to CLIProxyAPI (subscription-backed), unified here ----
+  - model_name: gpt-5.5
+    litellm_params:
+      model: openai/gpt-5.5
+      api_base: http://127.0.0.1:8317/v1
+      api_key: os.environ/CLI_PROXY_API_KEY
+  - model_name: gemini-3-pro-preview
+    litellm_params:
+      model: openai/gemini-3-pro-preview
+      api_base: http://127.0.0.1:8317/v1
+      api_key: os.environ/CLI_PROXY_API_KEY
+
+  # ---- optional hosted embeddings fallback (uncomment + set GEMINI_API_KEY) ----
+  # - model_name: embed-gemini
+  #   litellm_params:
+  #     model: gemini/gemini-embedding-001
+  #     api_key: os.environ/GEMINI_API_KEY
+
+litellm_settings:
+  drop_params: true        # tolerate provider-specific param differences (e.g. dimensions)
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

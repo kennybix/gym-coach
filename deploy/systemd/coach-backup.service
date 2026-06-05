@@ -1,0 +1,11 @@
+[Unit]
+Description=Gym Coach — nightly Postgres backup
+Wants=postgresql.service
+After=postgresql.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Documents/Projects/gym-coach
+EnvironmentFile=%h/Documents/Projects/gym-coach/.env
+ExecStart=/usr/bin/env bash %h/Documents/Projects/gym-coach/deploy/backup_db.sh
+Nice=15

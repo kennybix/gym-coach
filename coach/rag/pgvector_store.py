@@ -37,22 +37,33 @@ class PgVectorStore:
                values (%s, %s, %s, %s, %s, %s)
                on conflict (chunk_id) do update set embedding = excluded.embedding""",
             (chunk.chunk_id, chunk.doc_id, chunk.index, chunk.text,
-             _provenance_json(chunk.provenance), vector),
+             _provenance_json(chunk.provenance), _as_vector(vector)),
         )
 
     def search(self, query_vec, k: int = 4):
+        qv = _as_vector(query_vec)
         rows = self._connection().execute(
             """select chunk_id, doc_id, idx, text, provenance,
                       1 - (embedding <=> %s) as score
                from rag_chunks
                order by embedding <=> %s
                limit %s""",
-            (query_vec, query_vec, k),
+            (qv, qv, k),
         ).fetchall()
         return [(_row_to_chunk(r), float(r[5])) for r in rows]
 
     def __len__(self) -> int:
         return self._connection().execute("select count(*) from rag_chunks").fetchone()[0]
+
+
+def _as_vector(vector):
+    """Coerce a plain list[float] to a numpy float32 array so pgvector's psycopg adapter
+    types it as `vector` (a bare list is sent as double precision[], which the `<=>`
+    operator can't take)."""
+    import numpy as np
+    if isinstance(vector, np.ndarray):
+        return vector.astype(np.float32)
+    return np.asarray(vector, dtype=np.float32)
 
 
 def _provenance_json(p: Provenance) -> str:

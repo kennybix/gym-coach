@@ -42,20 +42,20 @@ export default function RestTimer({
   const frac = total > 0 ? left / total : 0;
 
   return (
-    <div className="fixed inset-0 z-50 bg-ink/[0.97] flex flex-col items-center justify-center px-6">
-      <p className="font-display text-dim text-xs tracking-[0.3em] mb-1">REST</p>
-      <p className="text-bone/80 text-sm mb-8">{exercise}</p>
+    <div className="fixed inset-0 z-50 bg-ink/95 backdrop-blur-md flex flex-col items-center justify-center px-6">
+      <p className="eyebrow mb-1.5">Rest</p>
+      <p className="text-bone/80 text-sm mb-10">{exercise}</p>
 
       <div className="relative">
         <svg width="300" height="300" viewBox="0 0 300 300" className="-rotate-90">
-          <circle cx="150" cy="150" r={R} fill="none" stroke="var(--color-line)" strokeWidth="6" />
+          <circle cx="150" cy="150" r={R} fill="none" stroke="var(--color-line)" strokeWidth="7" />
           <circle
             cx="150"
             cy="150"
             r={R}
             fill="none"
             stroke="var(--color-volt)"
-            strokeWidth="6"
+            strokeWidth="7"
             strokeLinecap="round"
             strokeDasharray={CIRC}
             strokeDashoffset={CIRC * (1 - frac)}
@@ -63,28 +63,22 @@ export default function RestTimer({
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="font-display tnum text-7xl font-semibold text-bone">
+          <span className="font-display tnum text-7xl font-bold text-bone">
             {mm}:{ss}
           </span>
         </div>
       </div>
 
-      <p className="text-dim text-sm mt-8">
-        next · <span className="text-bone">{nextSet}</span>
+      <p className="text-dim text-sm mt-10">
+        Next · <span className="text-bone font-medium">{nextSet}</span>
       </p>
 
       <div className="flex gap-3 mt-10 w-full max-w-xs">
-        <button
-          onClick={() => addTime(15)}
-          className="flex-1 h-14 border border-line bg-panel font-display text-sm tracking-widest text-bone active:bg-panel2"
-        >
+        <button onClick={() => addTime(15)} className="btn btn-ghost flex-1 h-14">
           +15s
         </button>
-        <button
-          onClick={onDone}
-          className="flex-1 h-14 bg-volt font-display text-sm tracking-widest text-ink font-semibold active:bg-voltdim"
-        >
-          GO
+        <button onClick={onDone} className="btn btn-primary flex-1 h-14">
+          Skip rest
         </button>
       </div>
     </div>

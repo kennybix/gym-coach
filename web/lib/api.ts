@@ -3,11 +3,14 @@
 
 export function apiBase(): string {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem("coach_api_base") || "http://localhost:8000";
+  // Same origin by default: Next rewrites proxy /api,/coach,/knowledge to the backend, so
+  // a relative path works locally AND behind Tailscale serve / nginx (no CORS, no setup).
+  // A stored value (Setup tab) or NEXT_PUBLIC_API_URL can override for split deployments.
+  return localStorage.getItem("coach_api_base") || process.env.NEXT_PUBLIC_API_URL || "";
 }
 export function token(): string {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem("coach_token") || "";
+  return localStorage.getItem("coach_token") || process.env.NEXT_PUBLIC_DEV_TOKEN || "";
 }
 export function configured(): boolean {
   return Boolean(token());
@@ -71,6 +74,24 @@ export const coachChat = (thread_id: string, message: string) =>
 
 export const coachConfirm = (thread_id: string, approved: boolean) =>
   coachPost("/coach/confirm", { thread_id, approved });
+
+export type Insight = { note: string | null; generated_at: string; focus: string; cached: boolean };
+
+export async function coachInsight(refresh = false, focus = "auto"): Promise<Insight | null> {
+  try {
+    const qs = new URLSearchParams();
+    if (refresh) qs.set("refresh", "true");
+    if (focus && focus !== "auto") qs.set("focus", focus);
+    const q = qs.toString();
+    const res = await fetch(`${apiBase()}/coach/insight${q ? `?${q}` : ""}`, {
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as Insight;
+  } catch {
+    return null;
+  }
+}
 
 export type Review = { status: string; summary: string; changes: Record<string, unknown>; created_at: string } | null;
 

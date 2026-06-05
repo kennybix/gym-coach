@@ -1,0 +1,11 @@
+[Unit]
+Description=Gym Coach — weekly review schedule (Mondays 07:00)
+
+[Timer]
+OnCalendar=Mon 07:00
+# Catch up a run missed because the machine was off/asleep.
+Persistent=true
+Unit=coach-review.service
+
+[Install]
+WantedBy=timers.target

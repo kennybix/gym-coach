@@ -1,47 +1,78 @@
 # Gym Coach
 
-A personal weight-loss training app: workout + nutrition logging with an AI coach that
-reads your actual logs, adapts your plan through a safety gate, and reviews each week.
+A personal weight-loss training app: log your workouts, nutrition, and vitals, and get an
+**AI coach that reads your actual data**, adapts your plan through a deterministic safety
+gate, reviews each week, and surfaces a proactive "here's what I noticed" — all on an
+installable, offline-capable PWA. It runs entirely on one machine and is served to the
+phone privately over Tailscale.
 
-- **Backend** (`coach/`) — FastAPI + a LangGraph coach agent + a deterministic safety
-  layer + Postgres (asyncpg). RAG and eval modules included.
-- **Frontend** (`web/`) — Next.js 15 PWA, installable and offline-capable: Today, Trends,
-  Fuel, Coach, Setup, plus a first-run onboarding wizard.
+<table>
+  <tr>
+    <td align="center"><img src="images/today.png" width="155"><br><sub><b>Today</b><br>log sets · coach insight</sub></td>
+    <td align="center"><img src="images/trends.png" width="155"><br><sub><b>Trends</b><br>weight + vitals</sub></td>
+    <td align="center"><img src="images/fuel.png" width="155"><br><sub><b>Fuel</b><br>food DB + macros</sub></td>
+    <td align="center"><img src="images/coach.png" width="155"><br><sub><b>Coach</b><br>grounded chat</sub></td>
+    <td align="center"><img src="images/setup.png" width="155"><br><sub><b>Setup</b><br>program · export</sub></td>
+  </tr>
+</table>
 
-> **Working in Claude Code?** Start with [`CLAUDE.md`](./CLAUDE.md) — it has the structure,
-> commands, and the architectural + safety invariants to preserve.
+## What it does
 
-## Quickstart (local)
+- **Today** — start a session and log sets with typeable weight/reps; edit or remove a
+  logged set in place; add exercises ad-hoc; a **proactive coach note** ("your latest BP
+  119/78 and HR 71 look steady…") you can tap to discuss.
+- **Trends** — adherence bars, a weight chart where you **tap a point to edit/remove** that
+  weigh-in, and a **vitals card** (blood pressure + heart rate, many per day, with sparklines).
+- **Fuel** — **food-database logging**: search [Open Food Facts](https://openfoodfacts.org),
+  **scan a barcode**, or re-tap a recent food; portions in grams or servings. A macro summary
+  shows protein as a goal to hit and calories *without* over/under judgment (wellbeing-first).
+- **Coach** — chat grounded in your real logs (it calls read tools before it claims progress),
+  proposes plan/target changes through a **safety gate** (it never writes directly), keeps
+  multi-chat history, sees your vitals, and posts a **weekly review**.
+- **Setup** — edit your program, browse/fix workout **history**, and **export a full backup**
+  (JSON + per-dataset CSV).
+
+## How it's built
+
+- **Backend** (`coach/`) — FastAPI + a LangGraph coach agent + a **deterministic safety layer**
+  (calorie floors, ED-history blocks, content screening — in code, not the prompt) + Postgres
+  (asyncpg). RAG (pgvector) and an LLM-as-judge eval harness included.
+- **Frontend** (`web/`) — Next.js 15 PWA (Node 20), offline write-queue, installable.
+- **LLM** — chat on **GPT-5.5 via a local CLI proxy** (subscription-backed, OpenAI-compatible);
+  **embeddings** via a **LiteLLM → Ollama** gateway (local `mxbai-embed-large`, free).
+- **Knowledge** — a cited RAG corpus from openly-licensed sources (CDC, NHS, MedlinePlus,
+  OpenStax), governance-gated.
+
+> **New here (human or agent)?** Read [`docs/SYSTEM_OVERVIEW.md`](docs/SYSTEM_OVERVIEW.md) —
+> the full architecture, services/ports, LLM wiring, phone deploy, and an operations cookbook.
+> Then [`CLAUDE.md`](CLAUDE.md) for the architectural + safety invariants.
+
+## Run it locally
 
 ```bash
 pip install -r requirements.txt
-./dev_up.sh                                   # Postgres + migrations (needs PG 14+ w/ pgvector)
+./dev_up.sh                                   # Postgres + migrations (PG 16 + pgvector)
+cp .env.example .env                          # fill in COACH_DB_URI, SUPABASE_JWT_SECRET, and
+                                              # the LLM env (OPENAI_BASE_URL/KEY -> your proxy)
+set -a; . ./.env; set +a
 
-cp .env.example .env                          # then fill it in
-export $(grep -v '^#' .env | xargs)           # or use your own env loader
+uvicorn coach.service:app --port 8010         # backend
+cd web && npm install && npm run build && npm run start -- --port 3010   # frontend (Node 20)
 
-uvicorn coach.service:app --port 8000         # backend
-cd web && npm install && npm run dev          # frontend -> http://localhost:3000
-
-SUPABASE_JWT_SECRET=$SUPABASE_JWT_SECRET python3 mint_token.py   # token for the Setup tab
+python mint_token.py <user-uuid>              # bearer token for the Setup tab
 ```
 
-Then open the app, go to **Setup**, paste the API URL + token, and complete onboarding.
-The coach activates once `GOOGLE_API_KEY` is set; without it, logging works and coach
-endpoints return 503.
+Open `http://localhost:3010`, go to **Setup**, paste the token (the API URL is automatic),
+and onboard. Without an LLM configured, logging works and coach endpoints return 503.
 
-## Status
+For the production setup on this machine (systemd services, auto-restart, nightly backup,
+weekly review) see [`deploy/README.md`](deploy/README.md).
 
-Built and validated to the limit of a headless environment: data layer (smoke + e2e
-against live Postgres), full test suite green (`pytest coach/tests`), every REST endpoint
-live-tested, both onboarding paths, all screens build and serve.
+## On your phone
 
-**Verify on your machine first:** (1) one real Gemini round-trip through the Coach to
-confirm tool-calling drives the safety gate; (2) a phone/browser pass on the PWA.
-
-**Remaining:** deployment hardening (CORS, HTTPS, backups), the weekly-review scheduler
-(cron → `/coach/review/run`), and ingesting a vetted RAG corpus (pipeline exists, corpus
-is empty). See `CLAUDE.md` for detail.
+Served **tailnet-only** over HTTPS via Tailscale Serve — private to your devices, no public
+exposure, no credentials in the JS bundle (token entered once on-device). Full steps:
+[`deploy/PHONE_ACCESS.md`](deploy/PHONE_ACCESS.md).
 
 ## Tests
 
@@ -51,8 +82,10 @@ COACH_DB_URI=... COACH_SEED_DIR=... python -m coach.smoke_test   # repo vs live 
 COACH_DB_URI=... COACH_SEED_DIR=... python -m coach.e2e_test     # full slice vs live PG
 ```
 
-## Credits / licensing
+## Safety & licensing
 
-Exercise catalog derived from [free-exercise-db](https://github.com/yuhonas/free-exercise-db)
-(public domain / Unlicense), ingested via `coach/ingest.py`. This is a personal project; review
-licensing before any public distribution.
+This is health-adjacent. Safety thresholds are **evidence-aligned** to CDC/NHS guidance and
+documented, but a **clinician must sign off** before any real launch —
+see [`deploy/SAFETY_REVIEW.md`](deploy/SAFETY_REVIEW.md). Exercise catalog from
+[free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain). Personal
+project — review licensing before any public distribution.

@@ -1,0 +1,16 @@
+[Unit]
+Description=Gym Coach — (re)apply Tailscale serve mapping at boot
+After=network-online.target coach-frontend.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# tailscaled already persists serve config across reboots; this re-asserts it as insurance.
+# Wait for tailscale to be up, then map https://<host>.ts.net/ -> the frontend (:3010),
+# which proxies /api,/coach,/knowledge to the backend. Errors are ignored (persistence covers us).
+# Requires `tailscale set --operator=$USER` to have been run once.
+ExecStart=/bin/sh -c 'for i in 1 2 3 4 5 6; do /usr/bin/tailscale status >/dev/null 2>&1 && break; sleep 5; done; /usr/bin/tailscale serve --bg http://127.0.0.1:3010 || true'
+
+[Install]
+WantedBy=default.target

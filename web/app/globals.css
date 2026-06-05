@@ -1,17 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #0c0d0f;
-  --color-panel: #15171b;
-  --color-panel2: #1b1e24;
-  --color-line: #272b33;
-  --color-bone: #eae8e0;
-  --color-dim: #8d919b;
-  --color-volt: #d4ff3f;
-  --color-voltdim: #97b62b;
-  --color-alert: #ff5d3a;
-  --font-display: "Chakra Petch", "Arial Narrow", system-ui, sans-serif;
-  --font-body: "Barlow", "Helvetica Neue", system-ui, sans-serif;
+  /* Surfaces — soft, layered dark (not flat black) */
+  --color-ink: #0a0b0f;
+  --color-panel: #16181f;
+  --color-panel2: #1f232c;
+  --color-line: #2a2f3a;
+  --color-bone: #f4f5f7;
+  --color-dim: #99a0ad;
+  /* Accent — a friendlier lime than the old neon */
+  --color-volt: #bef264;
+  --color-voltdim: #a6db4f;
+  --color-alert: #fb7185;
+
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
 }
 
 html {
@@ -21,39 +24,167 @@ html {
 body {
   font-family: var(--font-body);
   color: var(--color-bone);
-  background-color: var(--color-ink);
-  /* faint grain so the dark surface has texture, not dead flatness */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* a soft glow at the top instead of flat black + grain */
+  background: radial-gradient(125% 75% at 50% -12%, #161922 0%, var(--color-ink) 58%) fixed;
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   overscroll-behavior-y: none;
 }
 
 .font-display {
   font-family: var(--font-display);
-  letter-spacing: 0.02em;
+  letter-spacing: -0.015em;
 }
-
 .tnum {
   font-variant-numeric: tabular-nums;
 }
 
-/* hairline top accent used on cards */
-.rule-volt {
-  border-top: 2px solid var(--color-volt);
+/* small uppercase eyebrow label — softer tracking than the old tactical look */
+.eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-dim);
 }
 
-/* the set-logged flash */
-@keyframes logflash {
-  0% { background-color: color-mix(in srgb, var(--color-volt) 35%, transparent); }
-  100% { background-color: transparent; }
+/* ---------------------------------------------------------------- surfaces */
+.card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
+    0 20px 44px -30px rgba(0, 0, 0, 0.85);
 }
-.log-flash { animation: logflash 700ms ease-out; }
 
-/* staggered page-load reveal */
+/* ---------------------------------------------------------------- buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+  transition:
+    transform 0.12s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+.btn:active {
+  transform: scale(0.975);
+}
+.btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.btn-primary {
+  background: var(--color-volt);
+  color: #0a0b0f;
+}
+.btn-primary:active {
+  background: var(--color-voltdim);
+}
+.btn-ghost {
+  background: var(--color-panel2);
+  border: 1px solid var(--color-line);
+  color: var(--color-bone);
+}
+.btn-ghost:active {
+  background: var(--color-line);
+}
+
+/* ---------------------------------------------------------------- inputs */
+.field {
+  background: var(--color-panel2);
+  border: 1px solid var(--color-line);
+  border-radius: 0.9rem;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.field:focus,
+.field:focus-within {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-volt) 55%, var(--color-line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-volt) 13%, transparent);
+}
+
+/* segmented / choice button */
+.seg {
+  border-radius: 0.8rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-panel2);
+  color: var(--color-bone);
+  font-weight: 600;
+  transition:
+    transform 0.12s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.seg:active {
+  transform: scale(0.97);
+}
+.seg[data-on="true"] {
+  background: var(--color-volt);
+  border-color: var(--color-volt);
+  color: #0a0b0f;
+}
+
+/* chip / pill */
+.chip {
+  border-radius: 9999px;
+  border: 1px solid var(--color-line);
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------- motion */
 @keyframes rise {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
-.rise { animation: rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.rise {
+  animation: rise 460ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
 
-::selection { background: var(--color-volt); color: var(--color-ink); }
+@keyframes logflash {
+  0% {
+    background-color: color-mix(in srgb, var(--color-volt) 22%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.log-flash {
+  animation: logflash 750ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .log-flash {
+    animation: none;
+  }
+}
+
+::selection {
+  background: var(--color-volt);
+  color: #0a0b0f;
+}
+
+.scroll-soft::-webkit-scrollbar {
+  width: 8px;
+}
+.scroll-soft::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 9999px;
+}

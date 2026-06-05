@@ -1,0 +1,217 @@
+"use client";
+/* Food-database logging: search Open Food Facts (or scan a barcode), pick a food, log a
+   portion in grams. Recent foods re-log in one tap. The day's nutrition total is recomputed
+   server-side from these entries, so the streak, context, trends, and coach stay in sync. */
+import { useCallback, useEffect, useState } from "react";
+import { apiGet, apiPost } from "@/lib/api";
+import NumField from "./NumField";
+import BarcodeScanner from "./BarcodeScanner";
+
+type Food = { code: string | null; name: string; brand: string | null; kcal_100g: number; protein_100g: number; serving_g: number | null };
+type Entry = { id: string; name: string; brand: string | null; grams: number | null; kcal: number; protein_g: number | null };
+type Recent = { name: string; brand: string | null; grams: number | null; kcal: number; protein_g: number | null };
+
+export default function FoodLog({ date, onChange }: { date: string; onChange?: () => void }) {
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [recent, setRecent] = useState<Recent[]>([]);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<Food[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [picked, setPicked] = useState<Food | null>(null);
+  const [grams, setGrams] = useState(100);
+  const [unit, setUnit] = useState<"g" | "serving">("g");
+  const [servings, setServings] = useState(1);
+  const [gPerServing, setGPerServing] = useState(100);
+  const [scanning, setScanning] = useState(false);
+  const [looking, setLooking] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const loadEntries = useCallback(() => {
+    apiGet<{ foods: Entry[] }>(`/api/foods?date=${date}`).then((d) => setEntries(d.foods)).catch(() => setEntries([]));
+  }, [date]);
+  const loadRecent = useCallback(() => {
+    apiGet<{ foods: Recent[] }>("/api/foods/recent").then((d) => setRecent(d.foods)).catch(() => setRecent([]));
+  }, []);
+  useEffect(() => { loadEntries(); loadRecent(); }, [loadEntries, loadRecent]);
+
+  const refresh = useCallback(() => { loadEntries(); loadRecent(); onChange?.(); }, [loadEntries, loadRecent, onChange]);
+
+  const search = useCallback(() => {
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    setResults(null);
+    apiGet<{ foods: Food[] }>(`/api/foods/search?q=${encodeURIComponent(q)}`)
+      .then((d) => setResults(d.foods))
+      .catch(() => setResults([]))
+      .finally(() => setSearching(false));
+  }, [query]);
+
+  const choose = useCallback((f: Food) => {
+    setPicked(f);
+    setUnit("g");
+    setGrams(100);
+    setServings(1);
+    setGPerServing(f.serving_g ?? 100);
+  }, []);
+
+  const effectiveGrams = picked ? (unit === "serving" ? Math.round(servings * gPerServing) : grams) : 0;
+
+  const add = useCallback(async () => {
+    if (!picked) return;
+    const g = unit === "serving" ? Math.round(servings * gPerServing) : grams;
+    const kcal = Math.round((picked.kcal_100g * g) / 100);
+    const protein = Math.round((picked.protein_100g * g) / 100 * 10) / 10;
+    await apiPost("/api/foods/log", {
+      id: crypto.randomUUID(), logged_on: date, name: picked.name,
+      brand: picked.brand, grams: g, kcal, protein_g: protein,
+    });
+    setPicked(null); setResults(null); setQuery("");
+    refresh();
+  }, [picked, unit, servings, gPerServing, grams, date, refresh]);
+
+  const reLog = useCallback(async (r: Recent) => {
+    await apiPost("/api/foods/log", {
+      id: crypto.randomUUID(), logged_on: date, name: r.name,
+      brand: r.brand, grams: r.grams, kcal: r.kcal, protein_g: r.protein_g,
+    });
+    refresh();
+  }, [date, refresh]);
+
+  const remove = useCallback(async (e: Entry) => {
+    setEntries((p) => p.filter((x) => x.id !== e.id));
+    await apiPost("/api/foods/delete", { id: e.id, logged_on: date });
+    refresh();
+  }, [date, refresh]);
+
+  const onScanned = useCallback(async (code: string) => {
+    setScanning(false);
+    setLooking(true);
+    setNotice(null);
+    try {
+      const d = await apiGet<{ food: Food | null }>(`/api/foods/barcode/${encodeURIComponent(code)}`);
+      if (d.food) choose(d.food);
+      else setNotice(`No food found for barcode ${code}. Try a search instead.`);
+    } catch {
+      setNotice("Barcode lookup failed — check your connection.");
+    } finally {
+      setLooking(false);
+    }
+  }, []);
+
+  const totalK = entries.reduce((s, e) => s + e.kcal, 0);
+  const totalP = Math.round(entries.reduce((s, e) => s + (e.protein_g || 0), 0));
+
+  return (
+    <div className="card p-5 rise">
+      <div className="flex items-baseline justify-between mb-3.5">
+        <p className="eyebrow">Food log</p>
+        {entries.length > 0 && (
+          <span className="tnum text-sm text-dim">
+            <span className="text-volt font-semibold">{totalK}</span> kcal · {totalP} g
+          </span>
+        )}
+      </div>
+
+      {/* search + scan */}
+      <div className="flex gap-2">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && search()}
+          placeholder="Search foods (e.g. chicken breast)"
+          className="field flex-1 h-11 px-3.5 text-sm outline-none"
+          autoCapitalize="off"
+        />
+        <button onClick={search} disabled={searching} className="btn btn-primary px-4 text-sm">{searching ? "…" : "Search"}</button>
+        <button onClick={() => { setScanning(true); setNotice(null); }} aria-label="scan barcode" className="btn btn-ghost px-3" title="Scan barcode">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14M21 5v14" /></svg>
+        </button>
+      </div>
+
+      {looking && <p className="text-dim text-xs mt-2">Looking up barcode…</p>}
+      {notice && <p className="text-dim text-xs mt-2">{notice}</p>}
+
+      {/* recent — one-tap re-log */}
+      {recent.length > 0 && !results && !picked && (
+        <div className="mt-3">
+          <p className="text-dim text-xs mb-2">Recent</p>
+          <div className="flex flex-wrap gap-1.5">
+            {recent.slice(0, 8).map((r, i) => (
+              <button key={i} onClick={() => reLog(r)} className="chip px-3 py-1.5 text-xs text-bone/90 active:border-volt active:text-volt">
+                {r.name.length > 22 ? r.name.slice(0, 22) + "…" : r.name}
+                <span className="text-dim ml-1.5 tnum">{r.kcal}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* search results */}
+      {results && (
+        <div className="rounded-xl border border-line divide-y divide-line max-h-56 overflow-auto scroll-soft mt-3">
+          {results.map((f, i) => (
+            <button key={i} onClick={() => choose(f)} className="w-full text-left px-3.5 py-2.5 active:bg-panel2">
+              <span className="text-sm text-bone/90">{f.name}</span>
+              {f.brand && <span className="text-dim text-xs ml-2">{f.brand}</span>}
+              <span className="block text-dim text-xs mt-0.5 tnum">{f.kcal_100g} kcal · {f.protein_100g} g protein / 100g</span>
+            </button>
+          ))}
+          {results.length === 0 && <p className="text-dim text-xs p-3.5">No matches — try another search.</p>}
+        </div>
+      )}
+
+      {/* add-with-grams */}
+      {picked && (
+        <div className="mt-3 field p-3 space-y-3">
+          <p className="text-sm font-medium">{picked.name}{picked.brand ? ` · ${picked.brand}` : ""}</p>
+          <div className="flex gap-2">
+            <button data-on={unit === "g"} onClick={() => setUnit("g")} className="seg h-9 flex-1 text-xs">Grams</button>
+            <button data-on={unit === "serving"} onClick={() => setUnit("serving")} className="seg h-9 flex-1 text-xs">Servings</button>
+          </div>
+          {unit === "g" ? (
+            <NumField label="Grams" value={grams} onChange={setGrams} step={10} min={1} max={5000} unit="g" />
+          ) : (
+            <div className="space-y-2">
+              <NumField label="Servings" value={servings} onChange={setServings} step={0.5} min={0.5} max={50} decimals={1} unit="×" />
+              <div className="flex items-center gap-2">
+                <span className="text-dim text-xs shrink-0 w-20 pl-1">1 serving =</span>
+                <div className="flex-1"><NumField value={gPerServing} onChange={setGPerServing} step={5} min={1} max={2000} unit="g" compact /></div>
+              </div>
+            </div>
+          )}
+          <p className="text-dim text-xs tnum">
+            {unit === "serving" ? `${effectiveGrams} g · ` : ""}= {Math.round((picked.kcal_100g * effectiveGrams) / 100)} kcal · {Math.round((picked.protein_100g * effectiveGrams) / 100 * 10) / 10} g protein
+          </p>
+          <div className="flex gap-2">
+            <button onClick={add} className="btn btn-primary flex-1 h-10 text-sm">Add to day</button>
+            <button onClick={() => setPicked(null)} className="btn btn-ghost h-10 px-4 text-sm">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* today's entries */}
+      {entries.length > 0 && (
+        <ul className="mt-4 divide-y divide-line">
+          {entries.map((e) => (
+            <li key={e.id} className="py-2.5 flex items-center gap-2">
+              <span className="flex-1 min-w-0">
+                <span className="text-sm text-bone/90">{e.name}</span>
+                {e.brand && <span className="text-dim text-xs ml-2">{e.brand}</span>}
+                <span className="block text-dim text-xs mt-0.5 tnum">
+                  {e.grams ? `${e.grams} g · ` : ""}{e.kcal} kcal · {e.protein_g ?? 0} g protein
+                </span>
+              </span>
+              <button onClick={() => remove(e)} aria-label="remove food" className="text-dim hover:text-alert px-2 text-base leading-none shrink-0">×</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {entries.length === 0 && !results && recent.length === 0 && (
+        <p className="text-dim text-xs mt-3">Search or scan a food to add it — the day total updates automatically and feeds your trends + coach.</p>
+      )}
+
+      {scanning && <BarcodeScanner onCode={onScanned} onClose={() => setScanning(false)} />}
+    </div>
+  );
+}

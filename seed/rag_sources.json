@@ -1,0 +1,114 @@
+[
+  {
+    "doc_id": "cdc-adult-activity-overview",
+    "url": "https://www.cdc.gov/physical-activity-basics/guidelines/adults.html",
+    "source": "CDC — Physical Activity Basics",
+    "license": "public_domain",
+    "attribution": "Centers for Disease Control and Prevention (CDC), U.S. public domain"
+  },
+  {
+    "doc_id": "cdc-physical-activity-benefits",
+    "url": "https://www.cdc.gov/physical-activity-basics/benefits/index.html",
+    "source": "CDC — Physical Activity Basics",
+    "license": "public_domain",
+    "attribution": "Centers for Disease Control and Prevention (CDC), U.S. public domain"
+  },
+  {
+    "doc_id": "cdc-losing-weight",
+    "url": "https://www.cdc.gov/healthy-weight-growth/losing-weight/index.html",
+    "source": "CDC — Healthy Weight",
+    "license": "public_domain",
+    "attribution": "Centers for Disease Control and Prevention (CDC), U.S. public domain"
+  },
+  {
+    "doc_id": "nhs-physical-activity-guidelines-adults",
+    "url": "https://www.nhs.uk/live-well/exercise/exercise-guidelines/physical-activity-guidelines-for-adults-aged-19-to-64/",
+    "source": "NHS — Live Well",
+    "license": "open_gov",
+    "attribution": "Contains public sector information from the NHS website, licensed under the Open Government Licence v3.0"
+  },
+  {
+    "doc_id": "nhs-lose-weight-tips",
+    "url": "https://www.nhs.uk/live-well/healthy-weight/managing-your-weight/12-tips-to-help-you-lose-weight/",
+    "source": "NHS — Live Well",
+    "license": "open_gov",
+    "attribution": "Contains public sector information from the NHS website, licensed under the Open Government Licence v3.0"
+  },
+  {
+    "doc_id": "nhs-strength-flexibility-exercises",
+    "url": "https://www.nhs.uk/live-well/exercise/strength-and-flexibility-exercises/",
+    "source": "NHS — Live Well",
+    "license": "open_gov",
+    "attribution": "Contains public sector information from the NHS website, licensed under the Open Government Licence v3.0"
+  },
+  {
+    "doc_id": "openstax-ap-skeletal-muscle",
+    "url": "https://openstax.org/books/anatomy-and-physiology-2e/pages/10-2-skeletal-muscle",
+    "source": "OpenStax — Anatomy & Physiology 2e",
+    "license": "cc_by",
+    "attribution": "OpenStax, Anatomy & Physiology 2e. Access for free at openstax.org. CC BY 4.0"
+  },
+  {
+    "doc_id": "cdc-physical-activity-guidelines-overview",
+    "url": "https://www.cdc.gov/physical-activity-basics/guidelines/index.html",
+    "source": "CDC — Physical Activity Basics",
+    "license": "public_domain",
+    "attribution": "Centers for Disease Control and Prevention (CDC), U.S. public domain"
+  },
+  {
+    "doc_id": "cdc-healthy-weight-about",
+    "url": "https://www.cdc.gov/healthy-weight-growth/about/index.html",
+    "source": "CDC — Healthy Weight",
+    "license": "public_domain",
+    "attribution": "Centers for Disease Control and Prevention (CDC), U.S. public domain"
+  },
+  {
+    "doc_id": "cdc-adding-activity-adults",
+    "url": "https://www.cdc.gov/physical-activity-basics/adding-adults/index.html",
+    "source": "CDC — Physical Activity Basics",
+    "license": "public_domain",
+    "attribution": "Centers for Disease Control and Prevention (CDC), U.S. public domain"
+  },
+  {
+    "doc_id": "nhs-exercise-health-benefits",
+    "url": "https://www.nhs.uk/live-well/exercise/exercise-health-benefits/",
+    "source": "NHS — Live Well",
+    "license": "open_gov",
+    "attribution": "Contains public sector information from the NHS website, licensed under the Open Government Licence v3.0"
+  },
+  {
+    "doc_id": "nhs-balanced-diet",
+    "url": "https://www.nhs.uk/live-well/eat-well/how-to-eat-a-balanced-diet/eating-a-balanced-diet/",
+    "source": "NHS — Live Well",
+    "license": "open_gov",
+    "attribution": "Contains public sector information from the NHS website, licensed under the Open Government Licence v3.0"
+  },
+  {
+    "doc_id": "medlineplus-exercise-fitness",
+    "url": "https://medlineplus.gov/exerciseandphysicalfitness.html",
+    "source": "MedlinePlus (NIH)",
+    "license": "public_domain",
+    "attribution": "MedlinePlus, U.S. National Library of Medicine (public domain)"
+  },
+  {
+    "doc_id": "medlineplus-dietary-proteins",
+    "url": "https://medlineplus.gov/dietaryproteins.html",
+    "source": "MedlinePlus (NIH)",
+    "license": "public_domain",
+    "attribution": "MedlinePlus, U.S. National Library of Medicine (public domain)"
+  },
+  {
+    "doc_id": "openstax-ap-muscle-tissues-overview",
+    "url": "https://openstax.org/books/anatomy-and-physiology-2e/pages/10-1-overview-of-muscle-tissues",
+    "source": "OpenStax — Anatomy & Physiology 2e",
+    "license": "cc_by",
+    "attribution": "OpenStax, Anatomy & Physiology 2e. Access for free at openstax.org. CC BY 4.0"
+  },
+  {
+    "doc_id": "openstax-ap-muscle-tension",
+    "url": "https://openstax.org/books/anatomy-and-physiology-2e/pages/10-4-nervous-system-control-of-muscle-tension",
+    "source": "OpenStax — Anatomy & Physiology 2e",
+    "license": "cc_by",
+    "attribution": "OpenStax, Anatomy & Physiology 2e. Access for free at openstax.org. CC BY 4.0"
+  }
+]

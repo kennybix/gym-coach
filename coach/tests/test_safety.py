@@ -103,6 +103,45 @@ def test_rapid_loss_threshold_not_overzealous():
     # a sane ~1 lb/week phrasing should not trip the rapid-loss regex
     assert not safety.screen_user_message("i'd like to lose 1 lbs in a week").flagged
 
+# --- inbound: numeric extreme-deficit + rapid-loss intent (hardened) ----------
+@pytest.mark.parametrize("msg", [
+    "how do i survive on 500 calories a day?",
+    "i want to eat only 800 calories a day",
+    "should i restrict to 900 kcal daily",
+    "thinking of a 1000 calorie a day diet",
+    "is it ok to just eat 600 calories",
+])
+def test_inbound_low_calorie_intake_flagged(msg):
+    r = safety.screen_user_message(msg)
+    assert r.flagged and r.category == "extreme_deficit"
+
+@pytest.mark.parametrize("msg", [
+    "how do i lose weight as fast as possible",
+    "what's the fastest way to lose weight",
+    "i need to lose fat asap",
+    "help me slim down as quickly as possible",
+    "thinking about a crash diet",
+])
+def test_inbound_rapid_loss_intent_flagged(msg):
+    r = safety.screen_user_message(msg)
+    assert r.flagged and r.category == "extreme_deficit"
+
+@pytest.mark.parametrize("msg", [
+    "my maintenance is about 2400 calories a day, is that right?",
+    "i ate 2000 calories today, how did i do?",
+    "i want to build muscle as fast as possible",   # no weight-loss cue
+    "i burned 500 calories on the treadmill",        # exercise expenditure, not a per-day intake target
+])
+def test_inbound_high_or_neutral_calorie_not_flagged(msg):
+    assert not safety.screen_user_message(msg).flagged
+
+def test_outbound_does_not_clobber_numeric_refusal():
+    # The coach quotes the unsafe number while REFUSING it — outbound must not flag this,
+    # or the safe refusal would be replaced by generic copy.
+    reply = ("I can't set your target to 900 kcal/day — that's an extreme deficit. "
+             "Let's set a sustainable pace instead.")
+    assert not safety.screen_coach_reply(reply).flagged
+
 
 # --- content screening: outbound --------------------------------------------
 def test_outbound_catches_unsafe_reply():

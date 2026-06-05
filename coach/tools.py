@@ -44,7 +44,17 @@ def build_read_tools(repo: CoachRepo) -> list:
         t = await repo.get_current_targets(uid)
         return t.model_dump_json() if t else "{}"
 
-    return [get_weight_trend, get_adherence, get_nutrition_summary, get_current_targets]
+    @tool
+    async def get_recent_vitals(window_days: int, config: RunnableConfig) -> str:
+        """The user's logged blood-pressure and resting/heart-rate readings over the window
+        (summary: latest, averages, resting HR, range). Use to reference vitals trends in your
+        guidance. These are self-logged monitoring data, not clinical measurements — encourage
+        the user to have a genuinely concerning reading checked by a healthcare professional."""
+        import json
+        uid = config["configurable"]["user_id"]
+        return json.dumps(await repo.get_vitals_summary(uid, window_days))
+
+    return [get_weight_trend, get_adherence, get_nutrition_summary, get_current_targets, get_recent_vitals]
 
 
 def build_propose_tools(repo: CoachRepo) -> list:

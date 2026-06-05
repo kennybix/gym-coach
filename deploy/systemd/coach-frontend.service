@@ -1,0 +1,17 @@
+[Unit]
+Description=Gym Coach — Next.js PWA (next start)
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Documents/Projects/gym-coach/web
+# Next.js 15 / Tailwind v4 oxide need Node >= 20. Reference the nvm-installed Node 20
+# explicitly (systemd has no nvm in PATH). Update this path if you change Node versions.
+Environment=PATH=%h/.nvm/versions/node/v20.20.2/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.nvm/versions/node/v20.20.2/bin/npm run start -- --port 3010
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

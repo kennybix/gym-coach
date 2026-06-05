@@ -35,6 +35,30 @@ def _as_list(v) -> list:
     return v if isinstance(v, list) else json.loads(v)
 
 
+def _json_safe(v):
+    """Coerce a DB value to something JSON-serializable for the data export."""
+    import datetime
+    import decimal
+    import uuid
+
+    if isinstance(v, (datetime.datetime, datetime.date)):
+        return v.isoformat()
+    if isinstance(v, decimal.Decimal):
+        return float(v)
+    if isinstance(v, uuid.UUID):
+        return str(v)
+    if isinstance(v, str) and v[:1] in ("{", "["):  # jsonb came back as text
+        try:
+            return json.loads(v)
+        except ValueError:
+            return v
+    return v
+
+
+def _rows_json(records) -> list[dict]:
+    return [{k: _json_safe(val) for k, val in dict(r).items()} for r in records]
+
+
 class PostgresCoachRepo:
     """Implements the CoachRepo protocol."""
 
@@ -347,6 +371,27 @@ class PostgresCoachRepo:
                     inserted += int(status.rsplit(" ", 1)[-1])
         return inserted
 
+    async def delete_set_log(self, user_id: str, session_id: str, set_id: str) -> int:
+        """Delete one logged set, scoped to the owner's session. Idempotent: returns the
+        number of rows removed (0 if already gone), so offline-queue replays are safe."""
+        status = await self._pool.execute(
+            """delete from set_logs
+               where id = $1::uuid and user_id = $2::uuid and session_id = $3::uuid""",
+            set_id, user_id, session_id,
+        )
+        return int(status.rsplit(" ", 1)[-1])
+
+    async def update_set_log(self, user_id: str, session_id: str, set_id: str,
+                             reps, weight_kg) -> int:
+        """Edit a logged set's reps/weight in place, scoped to the owner's session.
+        Idempotent (same values -> same row); returns rows affected (0 if gone)."""
+        status = await self._pool.execute(
+            """update set_logs set reps = $4, weight_kg = $5
+               where id = $1::uuid and user_id = $2::uuid and session_id = $3::uuid""",
+            set_id, user_id, session_id, reps, weight_kg,
+        )
+        return int(status.rsplit(" ", 1)[-1])
+
     async def complete_session(self, user_id: str, session_id: str, completed_at) -> None:
         await self._pool.execute(
             """
@@ -355,6 +400,47 @@ class PostgresCoachRepo:
             """,
             session_id, user_id, completed_at,
         )
+
+    async def get_session_history(self, user_id: str, limit: int = 30) -> list[dict]:
+        """Past sessions (most recent first) with their logged sets + exercise names,
+        for the history screen. Empty sessions are omitted."""
+        sessions = await self._pool.fetch(
+            """select session_id, started_at, completed_at from sessions
+               where user_id = $1::uuid order by started_at desc limit $2""",
+            user_id, limit,
+        )
+        if not sessions:
+            return []
+        ids = [s["session_id"] for s in sessions]
+        rows = await self._pool.fetch(
+            """select id, session_id, exercise_id, reps, weight_kg, logged_at
+               from set_logs where user_id = $1::uuid and session_id = any($2::uuid[])
+               order by logged_at""",
+            user_id, ids,
+        )
+        by_session: dict = {}
+        for r in rows:
+            by_session.setdefault(str(r["session_id"]), []).append({
+                "id": str(r["id"]),
+                "exercise_id": r["exercise_id"],
+                "name": self._catalog.name_of(r["exercise_id"]),
+                "reps": r["reps"],
+                "weight_kg": float(r["weight_kg"]) if r["weight_kg"] is not None else None,
+                "logged_at": r["logged_at"].isoformat(),
+            })
+        out = []
+        for s in sessions:
+            sid = str(s["session_id"])
+            sets = by_session.get(sid, [])
+            if not sets:
+                continue
+            out.append({
+                "session_id": sid,
+                "started_at": s["started_at"].isoformat(),
+                "completed_at": s["completed_at"].isoformat() if s["completed_at"] else None,
+                "sets": sets,
+            })
+        return out
 
     # --- trends (weight series for charting + idempotent weight logging) ------
     async def get_weight_series(self, user_id: str, window_days: int) -> list[dict]:
@@ -381,6 +467,108 @@ class PostgresCoachRepo:
             """,
             metric_id, user_id, recorded_at, weight_kg,
         )
+
+    async def set_weight_for_date(self, user_id: str, day, weight_kg, recorded_at, metric_id: str) -> None:
+        """Set a single canonical weight for a calendar day (UTC): replace any existing
+        weigh-ins on that date with one value. Effect-idempotent, so queue replays converge."""
+        async with self._pool.acquire() as con:
+            async with con.transaction():
+                await con.execute(
+                    "delete from body_metrics where user_id = $1::uuid "
+                    "and (recorded_at at time zone 'utc')::date = $2",
+                    user_id, day,
+                )
+                await con.execute(
+                    "insert into body_metrics (id, user_id, recorded_at, weight_kg) "
+                    "values ($1::uuid, $2::uuid, $3, $4)",
+                    metric_id, user_id, recorded_at, weight_kg,
+                )
+
+    async def delete_weight_for_date(self, user_id: str, day) -> int:
+        """Remove all weigh-ins on a calendar day (UTC). Idempotent (0 if none)."""
+        status = await self._pool.execute(
+            "delete from body_metrics where user_id = $1::uuid "
+            "and (recorded_at at time zone 'utc')::date = $2",
+            user_id, day,
+        )
+        return int(status.rsplit(" ", 1)[-1])
+
+    # --- vitals (timestamped BP / heart-rate log; many per day) --------------
+    async def insert_vital(self, user_id: str, vid: str, recorded_at, systolic,
+                           diastolic, heart_rate, tag, note) -> None:
+        """Idempotent (client-generated id) so offline vitals entries replay safely."""
+        await self._pool.execute(
+            """insert into vitals (id, user_id, recorded_at, systolic, diastolic, heart_rate, tag, note)
+               values ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8)
+               on conflict (id) do nothing""",
+            vid, user_id, recorded_at, systolic, diastolic, heart_rate, tag, note,
+        )
+
+    async def update_vital(self, user_id: str, vid: str, systolic, diastolic,
+                           heart_rate, tag, note) -> int:
+        status = await self._pool.execute(
+            """update vitals set systolic = $3, diastolic = $4, heart_rate = $5, tag = $6, note = $7
+               where id = $1::uuid and user_id = $2::uuid""",
+            vid, user_id, systolic, diastolic, heart_rate, tag, note,
+        )
+        return int(status.rsplit(" ", 1)[-1])
+
+    async def delete_vital(self, user_id: str, vid: str) -> int:
+        status = await self._pool.execute(
+            "delete from vitals where id = $1::uuid and user_id = $2::uuid", vid, user_id
+        )
+        return int(status.rsplit(" ", 1)[-1])
+
+    async def get_vitals(self, user_id: str, limit: int = 50) -> list[dict]:
+        rows = await self._pool.fetch(
+            """select id, recorded_at, systolic, diastolic, heart_rate, tag, note
+               from vitals where user_id = $1::uuid order by recorded_at desc limit $2""",
+            user_id, limit,
+        )
+        return [{
+            "id": str(r["id"]),
+            "recorded_at": r["recorded_at"].isoformat(),
+            "systolic": r["systolic"],
+            "diastolic": r["diastolic"],
+            "heart_rate": r["heart_rate"],
+            "tag": r["tag"],
+            "note": r["note"],
+        } for r in rows]
+
+    async def get_vitals_summary(self, user_id: str, window_days: int = 30) -> dict:
+        """Compact vitals summary for the coach: latest + averages + trend, over a window."""
+        rows = await self._pool.fetch(
+            """select recorded_at, systolic, diastolic, heart_rate, tag from vitals
+               where user_id = $1::uuid
+                 and recorded_at >= now() - make_interval(days => $2::int)
+               order by recorded_at""",
+            user_id, window_days,
+        )
+        bp = [(r["systolic"], r["diastolic"], r["recorded_at"]) for r in rows if r["systolic"] is not None]
+        hr = [(r["heart_rate"], r["recorded_at"], (r["tag"] or "")) for r in rows if r["heart_rate"] is not None]
+        rest_hr = [h[0] for h in hr if h[2].lower() in ("resting", "morning")]
+
+        def avg(xs):
+            return round(sum(xs) / len(xs), 1) if xs else None
+
+        out = {"window_days": window_days, "n_readings": len(rows)}
+        if bp:
+            out["blood_pressure"] = {
+                "latest": f"{bp[-1][0]}/{bp[-1][1]}",
+                "avg_systolic": avg([b[0] for b in bp]),
+                "avg_diastolic": avg([b[1] for b in bp]),
+                "n": len(bp),
+            }
+        if hr:
+            out["heart_rate"] = {
+                "latest_bpm": hr[-1][0],
+                "avg_bpm": avg([h[0] for h in hr]),
+                "resting_avg_bpm": avg(rest_hr) if rest_hr else None,
+                "min_bpm": min(h[0] for h in hr),
+                "max_bpm": max(h[0] for h in hr),
+                "n": len(hr),
+            }
+        return out
 
     async def get_latest_review(self, user_id: str) -> Optional[dict]:
         row = await self._pool.fetchrow(
@@ -411,6 +599,70 @@ class PostgresCoachRepo:
             """,
             user_id, logged_on, kcal, protein_g,
         )
+
+    # --- itemized food entries (food-database logging) ----------------------
+    async def insert_food_entry(self, user_id: str, fid: str, logged_on, name, brand,
+                                grams, kcal, protein_g) -> None:
+        """Idempotent (client-generated id) so offline food logging replays safely."""
+        await self._pool.execute(
+            """insert into food_entries (id, user_id, logged_on, name, brand, grams, kcal, protein_g)
+               values ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8)
+               on conflict (id) do nothing""",
+            fid, user_id, logged_on, name, brand, grams, kcal, protein_g,
+        )
+
+    async def get_food_entries(self, user_id: str, logged_on) -> list[dict]:
+        rows = await self._pool.fetch(
+            """select id, name, brand, grams, kcal, protein_g from food_entries
+               where user_id = $1::uuid and logged_on = $2 order by created_at""",
+            user_id, logged_on,
+        )
+        return [{
+            "id": str(r["id"]), "name": r["name"], "brand": r["brand"],
+            "grams": float(r["grams"]) if r["grams"] is not None else None,
+            "kcal": r["kcal"],
+            "protein_g": float(r["protein_g"]) if r["protein_g"] is not None else None,
+        } for r in rows]
+
+    async def delete_food_entry(self, user_id: str, fid: str) -> int:
+        status = await self._pool.execute(
+            "delete from food_entries where id = $1::uuid and user_id = $2::uuid", fid, user_id
+        )
+        return int(status.rsplit(" ", 1)[-1])
+
+    async def get_recent_foods(self, user_id: str, limit: int = 12) -> list[dict]:
+        """Distinct recently-logged foods (most recent portion), for one-tap re-logging."""
+        rows = await self._pool.fetch(
+            """select distinct on (lower(name), coalesce(lower(brand), ''))
+                      name, brand, grams, kcal, protein_g, created_at
+               from food_entries where user_id = $1::uuid
+               order by lower(name), coalesce(lower(brand), ''), created_at desc""",
+            user_id,
+        )
+        items = [{
+            "name": r["name"], "brand": r["brand"],
+            "grams": float(r["grams"]) if r["grams"] is not None else None,
+            "kcal": r["kcal"],
+            "protein_g": float(r["protein_g"]) if r["protein_g"] is not None else None,
+            "_ts": r["created_at"],
+        } for r in rows]
+        items.sort(key=lambda x: x["_ts"], reverse=True)
+        for it in items:
+            del it["_ts"]
+        return items[:limit]
+
+    async def recompute_nutrition_day(self, user_id: str, logged_on) -> dict:
+        """Set the day's nutrition_logs total to the sum of its food entries, so the summary,
+        coach, and trends stay consistent. Food entries own the day's total when present."""
+        row = await self._pool.fetchrow(
+            """select coalesce(sum(kcal), 0)::int as kcal,
+                      coalesce(sum(protein_g), 0)::numeric as protein_g
+               from food_entries where user_id = $1::uuid and logged_on = $2""",
+            user_id, logged_on,
+        )
+        kcal, protein = row["kcal"], float(row["protein_g"])
+        await self.upsert_nutrition_day(user_id, logged_on, kcal, protein)
+        return {"kcal": kcal, "protein_g": protein}
 
     async def get_nutrition_series(self, user_id: str, window_days: int) -> list[dict]:
         rows = await self._pool.fetch(
@@ -469,6 +721,37 @@ class PostgresCoachRepo:
                         pid, e["exercise_id"], i, e["sets"], e["reps"],
                     )
         return str(pid)
+
+    async def get_active_program_meta(self, user_id: str) -> Optional[dict]:
+        """Name + cadence of the active program, so an editor can preserve them on save."""
+        row = await self._pool.fetchrow(
+            "select name, sessions_per_week from programs where user_id = $1::uuid and is_active limit 1",
+            user_id,
+        )
+        return {"name": row["name"], "sessions_per_week": row["sessions_per_week"]} if row else None
+
+    async def export_all(self, user_id: str) -> dict:
+        """A complete, JSON-serializable dump of the user's own data — for backup/export."""
+        async def q(sql: str) -> list[dict]:
+            return _rows_json(await self._pool.fetch(sql, user_id))
+
+        profiles = await q("select * from profiles where user_id = $1::uuid")
+        programs = await q("select * from programs where user_id = $1::uuid order by created_at")
+        program_exercises = await q(
+            """select pe.* from program_exercises pe join programs p on p.program_id = pe.program_id
+               where p.user_id = $1::uuid order by pe.program_id, pe.position"""
+        )
+        return {
+            "profile": profiles[0] if profiles else None,
+            "targets": await q("select * from targets where user_id = $1::uuid order by created_at"),
+            "weight": await q("select * from body_metrics where user_id = $1::uuid order by recorded_at"),
+            "nutrition": await q("select * from nutrition_logs where user_id = $1::uuid order by logged_on"),
+            "vitals": await q("select * from vitals where user_id = $1::uuid order by recorded_at"),
+            "workouts": await self.get_session_history(user_id, 1000),
+            "programs": programs,
+            "program_exercises": program_exercises,
+            "reviews": await q("select * from coach_reviews where user_id = $1::uuid order by created_at"),
+        }
 
     def search_catalog(self, q=None, equipment=None, limit: int = 30) -> list[dict]:
         return self._catalog.search(q=q, equipment=equipment, limit=limit)

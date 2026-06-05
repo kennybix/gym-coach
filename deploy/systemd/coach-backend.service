@@ -1,0 +1,18 @@
+[Unit]
+Description=Gym Coach — FastAPI backend (uvicorn)
+Wants=cli-proxy.service
+After=cli-proxy.service network-online.target
+# Postgres is a SYSTEM service (can't be ordered from a user unit), so we just retry until
+# it (and the DB pool) is ready — never give up, regardless of boot order.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Documents/Projects/gym-coach
+EnvironmentFile=%h/Documents/Projects/gym-coach/.env
+ExecStart=%h/Documents/Projects/gym-coach/.venv/bin/uvicorn coach.service:app --host 127.0.0.1 --port 8010
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

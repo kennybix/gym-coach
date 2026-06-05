@@ -1,58 +1,40 @@
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
 import "./globals.css";
 import SwRegister from "@/components/SwRegister";
+import DevAutoConfig from "@/components/DevAutoConfig";
+import NavBar from "@/components/NavBar";
 
 export const metadata: Metadata = {
   title: "Gym Coach",
   description: "Personal training log + AI coach",
   manifest: "/manifest.json",
+  icons: { icon: "/icon-192.png", apple: "/icon-192.png" },
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "GymCoach" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0c0d0f",
+  themeColor: "#0a0b0f",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
 };
 
-const TABS = [
-  { href: "/", label: "TODAY" },
-  { href: "/trends", label: "TRENDS" },
-  { href: "/nutrition", label: "FUEL" },
-  { href: "/coach", label: "COACH" },
-  { href: "/settings", label: "SETUP" },
-];
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
-        {/* Fonts load at runtime; build stays offline-safe */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
           rel="stylesheet"
         />
       </head>
       <body className="min-h-dvh flex flex-col">
         <SwRegister />
-        <main className="flex-1 w-full max-w-md mx-auto px-4 pb-28 pt-5">{children}</main>
-        <nav className="fixed bottom-0 inset-x-0 border-t border-line bg-panel/95 backdrop-blur">
-          <div className="max-w-md mx-auto grid grid-cols-5">
-            {TABS.map((t) => (
-              <Link
-                key={t.href}
-                href={t.href}
-                className="font-display text-[10px] tracking-[0.12em] text-dim text-center py-4 active:text-volt"
-              >
-                {t.label}
-              </Link>
-            ))}
-          </div>
-        </nav>
+        <DevAutoConfig />
+        <main className="flex-1 w-full max-w-md mx-auto px-5 pt-7 pb-28">{children}</main>
+        <NavBar />
       </body>
     </html>
   );

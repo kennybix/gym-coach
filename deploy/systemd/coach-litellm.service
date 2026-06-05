@@ -1,0 +1,18 @@
+[Unit]
+Description=LiteLLM gateway — OpenAI-compatible API (embeddings via Ollama + chat via CLIProxyAPI)
+Wants=cli-proxy.service
+After=cli-proxy.service network-online.target
+# Ollama is a SYSTEM service; retry until it (and the CLI proxy) are reachable.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Documents/Projects/gym-coach/deploy/litellm
+EnvironmentFile=%h/.local/share/litellm/litellm.env
+ExecStart=%h/.local/share/litellm/venv/bin/litellm \
+    --config %h/Documents/Projects/gym-coach/deploy/litellm/config.yaml --port 4000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

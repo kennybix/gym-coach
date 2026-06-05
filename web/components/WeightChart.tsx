@@ -1,15 +1,20 @@
 "use client";
 /* Hand-rolled SVG line chart — no chart lib, stays on-aesthetic and dependency-free.
- * Emphasizes the trend shape over individual daily readings. */
+ * Emphasizes the trend shape over individual daily readings. Points are tappable so
+ * Trends can edit/remove a weigh-in. */
 
 export type WeightPoint = { date: string; weight_kg: number };
 
 export default function WeightChart({
   series,
   goalKg,
+  selectedDate,
+  onSelect,
 }: {
   series: WeightPoint[];
   goalKg: number | null;
+  selectedDate?: string | null;
+  onSelect?: (date: string) => void;
 }) {
   if (series.length < 2) {
     return (
@@ -21,7 +26,7 @@ export default function WeightChart({
 
   const W = 320;
   const H = 150;
-  const PAD = 8;
+  const PAD = 10;
 
   const ws = series.map((p) => p.weight_kg);
   const lo = Math.min(...ws, goalKg ?? Infinity);
@@ -36,7 +41,7 @@ export default function WeightChart({
   const goalY = goalKg != null ? y(goalKg) : null;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" style={{ touchAction: "manipulation" }}>
       <defs>
         <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="var(--color-volt)" stopOpacity="0.22" />
@@ -46,26 +51,32 @@ export default function WeightChart({
 
       {goalY != null && (
         <>
-          <line
-            x1={PAD}
-            y1={goalY}
-            x2={W - PAD}
-            y2={goalY}
-            stroke="var(--color-dim)"
-            strokeWidth="1"
-            strokeDasharray="3 4"
-          />
-          <text x={W - PAD} y={goalY - 4} textAnchor="end" fontSize="9" fill="var(--color-dim)">
-            goal
-          </text>
+          <line x1={PAD} y1={goalY} x2={W - PAD} y2={goalY} stroke="var(--color-dim)" strokeWidth="1" strokeDasharray="3 4" />
+          <text x={W - PAD} y={goalY - 4} textAnchor="end" fontSize="9" fill="var(--color-dim)">goal</text>
         </>
       )}
 
       <path d={area} fill="url(#fade)" />
       <path d={line} fill="none" stroke="var(--color-volt)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-      {series.map((p, i) => (
-        <circle key={i} cx={x(i)} cy={y(p.weight_kg)} r="2" fill="var(--color-ink)" stroke="var(--color-volt)" strokeWidth="1.5" />
-      ))}
+
+      {series.map((p, i) => {
+        const sel = p.date === selectedDate;
+        return (
+          <g key={p.date} onClick={() => onSelect?.(p.date)} style={{ cursor: onSelect ? "pointer" : "default" }}>
+            {/* generous transparent hit target for sweaty thumbs */}
+            <circle cx={x(i)} cy={y(p.weight_kg)} r="14" fill="transparent" />
+            {sel && <circle cx={x(i)} cy={y(p.weight_kg)} r="6" fill="none" stroke="var(--color-bone)" strokeWidth="1.5" />}
+            <circle
+              cx={x(i)}
+              cy={y(p.weight_kg)}
+              r={sel ? 4 : 2.5}
+              fill={sel ? "var(--color-volt)" : "var(--color-ink)"}
+              stroke="var(--color-volt)"
+              strokeWidth="1.5"
+            />
+          </g>
+        );
+      })}
     </svg>
   );
 }
