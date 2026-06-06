@@ -35,7 +35,11 @@ friction that blocks the daily loop* — not chase feature parity for its own sa
 
 ---
 
-# Phase 1 — "A coach you can trust, fed by real lifting signal"
+# Phase 1 — "A coach you can trust, fed by real lifting signal"  ✅ SHIPPED 2026-06-06
+
+All items below shipped: A1 sparse-data caution, B1 RPE/set-type, B2 PR+est-1RM, B3 per-exercise
+progression view, B4 deterministic next-load suggestion, A2 coach evidence panel, A3 proposal diffs.
+
 
 The two halves reinforce: richer logged signal (RPE, PRs, progression) → better, more concrete
 coach evidence. Ship in the order below; each item lists acceptance criteria.
