@@ -25,6 +25,7 @@ from langchain_core.messages import (
     HumanMessage,
     RemoveMessage,
     SystemMessage,
+    ToolMessage,
 )
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -63,6 +64,105 @@ SYSTEM_PROMPT = (
     "through injury, anything resembling disordered eating) and offer a safe alternative. "
     "You are not a medical professional; say so when relevant."
 )
+
+
+def _evidence_for(name: str, d: dict) -> Optional[dict]:
+    """Turn one read-tool result into a compact {label, detail} the UI can show, so the user
+    sees the real figures the coach looked at. None = nothing worth showing."""
+    g = d.get
+    if name == "get_weight_trend":
+        n = g("n_points") or 0
+        if not n:
+            return None
+        s, l, span = g("start_kg"), g("latest_kg"), g("span_days") or 0
+        detail = f"{s:g}→{l:g} kg" if s is not None and l is not None else "logged"
+        rate = g("smoothed_slope_kg_per_week")
+        detail += f" · ~{abs(rate):.1f} kg/wk over {span}d" if g("sufficient") and rate is not None \
+            else f" · {n} logs/{span}d (building)"
+        return {"label": "Weight", "detail": detail}
+    if name == "get_adherence":
+        return {"label": "Training",
+                "detail": f"{g('sessions_completed', 0)}/{g('sessions_prescribed', 0)} sessions · "
+                          f"{g('sets_completed', 0)}/{g('sets_prescribed', 0)} sets"}
+    if name == "get_nutrition_summary":
+        if not (g("days_logged") or 0):
+            return None
+        parts = []
+        if g("avg_kcal") is not None:
+            parts.append(f"{round(g('avg_kcal'))} kcal" + (f"/{g('target_kcal')}" if g("target_kcal") else ""))
+        if g("avg_protein_g") is not None:
+            parts.append(f"{round(g('avg_protein_g'))} g protein")
+        return {"label": "Nutrition", "detail": " · ".join(parts + [f"{g('days_logged')}d logged"])}
+    if name == "get_current_targets":
+        if not g("daily_kcal"):
+            return None
+        return {"label": "Targets", "detail": f"{g('daily_kcal')} kcal · {g('protein_g')} g protein"}
+    if name == "get_recent_vitals":
+        if not (g("n_readings") or 0):
+            return None
+        latest, parts = g("latest") or {}, []
+        if isinstance(latest, dict):
+            if latest.get("systolic") and latest.get("diastolic"):
+                parts.append(f"{latest['systolic']}/{latest['diastolic']}")
+            if latest.get("heart_rate"):
+                parts.append(f"{latest['heart_rate']} bpm")
+        return {"label": "Vitals", "detail": " · ".join(parts) or f"{g('n_readings')} readings"}
+    return None
+
+
+def summarize_evidence(messages: list) -> list[dict]:
+    """The real data the coach pulled on the latest turn (tool results since the last user
+    message), as {label, detail} chips. Truthful by construction — it's what the tools returned."""
+    import json
+    last_human = max((i for i, m in enumerate(messages) if isinstance(m, HumanMessage)), default=-1)
+    by_label: dict[str, dict] = {}
+    for m in messages[last_human + 1:]:
+        if not isinstance(m, ToolMessage):
+            continue
+        try:
+            data = json.loads(m.content) if isinstance(m.content, str) else None
+        except Exception:
+            data = None
+        if isinstance(data, dict):
+            ev = _evidence_for(getattr(m, "name", "") or "", data)
+            if ev:
+                by_label[ev["label"]] = ev  # last call of a tool wins
+    return list(by_label.values())
+
+
+async def proposal_diff(repo: CoachRepo, uid: str, pending: dict) -> list[dict]:
+    """Old→new rows for a staged change, so the confirm card shows exactly what will change."""
+    kind = pending.get("kind")
+    if kind == "target_change":
+        cur = await repo.get_current_targets(uid)
+        return [
+            {"label": "Daily calories", "from": f"{cur.daily_kcal} kcal" if cur else "—",
+             "to": f"{pending.get('new_daily_kcal')} kcal"},
+            {"label": "Protein", "from": f"{cur.protein_g} g" if cur else "—",
+             "to": f"{pending.get('new_protein_g')} g"},
+        ]
+    if kind == "program_change":
+        by_id = {s["program_exercise_id"]: s for s in await repo.get_program_slots(uid)}
+
+        def fmt(sets, reps, load):
+            if not sets and not reps:
+                return "—"
+            return f"{sets}×{reps}" + (f" @ {load:g} kg" if load else "")
+
+        out = []
+        for e in pending.get("edits", []):
+            cur = by_id.get(e.get("program_exercise_id"), {})
+            name = cur.get("name", "Exercise")
+            frm = fmt(cur.get("sets"), cur.get("reps"), cur.get("load_kg"))
+            if e.get("swap_to_exercise_id"):
+                out.append({"label": name, "from": frm, "to": "swap to fit equipment"})
+            else:
+                to = fmt(e.get("sets") or cur.get("sets"), e.get("reps") or cur.get("reps"),
+                         e.get("load_kg") if e.get("load_kg") is not None else cur.get("load_kg"))
+                out.append({"label": name, "from": frm, "to": to})
+        return out
+    return []
+
 
 def build_coach_graph(repo: CoachRepo, checkpointer, model_id: str = "google_genai:gemini-3.5-flash", model=None):
     read_tools = build_read_tools(repo)
@@ -133,8 +233,9 @@ def build_coach_graph(repo: CoachRepo, checkpointer, model_id: str = "google_gen
             )
 
         if verdict.requires_user_confirmation:
+            diff = await proposal_diff(repo, uid, pending)
             approved = interrupt(
-                {"type": "confirm_change", "proposal": pending, "reason": verdict.reason}
+                {"type": "confirm_change", "proposal": pending, "reason": verdict.reason, "diff": diff}
             )
             if not approved:
                 return Command(

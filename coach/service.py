@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import api as rest_api
 from .auth import get_current_user_id
-from .graph import build_coach_graph
+from .graph import build_coach_graph, summarize_evidence
 from .insight import generate_insight
 from .review import build_review_graph
 from .pg_repo import PostgresCoachRepo
@@ -96,7 +96,11 @@ async def chat(body: ChatIn, user_id: str = Depends(get_current_user_id)):
     pending = [t for t in snapshot.tasks if getattr(t, "interrupts", None)]
     if pending:
         return {"status": "needs_confirmation", "payload": pending[0].interrupts[0].value}
-    return {"status": "ok", "reply": result["messages"][-1].content}
+    return {
+        "status": "ok",
+        "reply": result["messages"][-1].content,
+        "evidence": summarize_evidence(result["messages"]),
+    }
 
 
 class ConfirmIn(BaseModel):

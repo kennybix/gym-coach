@@ -10,7 +10,7 @@ import {
 } from "@/lib/api";
 import Markdown from "@/components/Markdown";
 
-type Msg = { role: "user" | "coach" | "system"; text: string };
+type Msg = { role: "user" | "coach" | "system"; text: string; evidence?: { label: string; detail: string }[] };
 type Session = { id: string; title: string; msgs: Msg[]; updated: number };
 
 const SKEY = "coach_sessions";
@@ -64,7 +64,7 @@ export default function CoachView() {
   const [activeId, setActiveId] = useState<string>("");
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [confirm, setConfirm] = useState<{ reason: string } | null>(null);
+  const [confirm, setConfirm] = useState<{ reason: string; diff?: { label: string; from: string; to: string }[] } | null>(null);
   const [review, setReview] = useState<Review>(null);
   const [ready, setReady] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -121,9 +121,9 @@ export default function CoachView() {
       if (r.kind === "unavailable") {
         pushMsg({ role: "system", text: "Coach is offline — add your LLM key on the server to enable chat." });
       } else if (r.kind === "reply") {
-        pushMsg({ role: "coach", text: r.text });
+        pushMsg({ role: "coach", text: r.text, evidence: r.evidence });
       } else {
-        setConfirm({ reason: r.payload.reason });
+        setConfirm({ reason: r.payload.reason, diff: r.payload.diff });
       }
     },
     [pushMsg]
@@ -249,11 +249,23 @@ export default function CoachView() {
           </div>
         )}
         {msgs.map((m, i) => (
-          <Bubble key={i} role={m.role} text={m.text} />
+          <Bubble key={i} role={m.role} text={m.text} evidence={m.evidence} />
         ))}
         {confirm && (
           <div className="card p-4 border-volt/50">
             <p className="text-sm text-bone/90 mb-2">{confirm.reason}</p>
+            {confirm.diff && confirm.diff.length > 0 && (
+              <ul className="mb-3 space-y-1.5">
+                {confirm.diff.map((d, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm">
+                    <span className="text-dim text-xs w-24 shrink-0 truncate">{d.label}</span>
+                    <span className="text-dim tnum line-through">{d.from}</span>
+                    <span className="text-dim">→</span>
+                    <span className="text-volt tnum font-semibold">{d.to}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
             <p className="text-dim text-xs mb-3">This is a sizeable change — confirm to apply it.</p>
             <div className="flex gap-2.5">
               <button onClick={() => resolve(true)} className="btn btn-primary flex-1 h-11">Approve</button>
@@ -330,20 +342,32 @@ function Thinking() {
   );
 }
 
-function Bubble({ role, text }: { role: Msg["role"]; text: string }) {
+function Bubble({ role, text, evidence }: { role: Msg["role"]; text: string; evidence?: Msg["evidence"] }) {
   if (role === "system")
     return <p className="text-center text-dim text-xs px-6 py-1">{text}</p>;
   const mine = role === "user";
   return (
     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`max-w-[84%] min-w-0 break-words px-4 py-2.5 text-sm leading-relaxed ${
-          mine
-            ? "bg-volt text-ink rounded-2xl rounded-br-md font-medium"
-            : "card rounded-2xl rounded-bl-md text-bone/90"
-        }`}
-      >
-        {mine ? text : <Markdown>{text}</Markdown>}
+      <div className={`max-w-[84%] min-w-0 ${mine ? "" : "space-y-1.5"}`}>
+        <div
+          className={`break-words px-4 py-2.5 text-sm leading-relaxed ${
+            mine
+              ? "bg-volt text-ink rounded-2xl rounded-br-md font-medium"
+              : "card rounded-2xl rounded-bl-md text-bone/90"
+          }`}
+        >
+          {mine ? text : <Markdown>{text}</Markdown>}
+        </div>
+        {!mine && evidence && evidence.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-1">
+            <span className="text-dim text-[10px] uppercase tracking-wide self-center">Based on</span>
+            {evidence.map((e, i) => (
+              <span key={i} className="chip px-2 py-0.5 text-[11px] text-dim">
+                <span className="text-bone/80">{e.label}</span> {e.detail}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

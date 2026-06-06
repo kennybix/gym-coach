@@ -67,9 +67,10 @@ export const exerciseStats = (id: string) =>
   apiGet<ExerciseStats>(`/api/exercise/${encodeURIComponent(id)}/stats`);
 
 /* ---- coach endpoints (separate from /api; may be 503 if no LLM configured) ---- */
+export type Evidence = { label: string; detail: string };
 export type CoachReply =
-  | { kind: "reply"; text: string }
-  | { kind: "confirm"; payload: { proposal: unknown; reason: string } }
+  | { kind: "reply"; text: string; evidence?: Evidence[] }
+  | { kind: "confirm"; payload: { proposal: unknown; reason: string; diff?: { label: string; from: string; to: string }[] } }
   | { kind: "unavailable" };
 
 async function coachPost(path: string, body: unknown): Promise<CoachReply> {
@@ -82,7 +83,7 @@ async function coachPost(path: string, body: unknown): Promise<CoachReply> {
   if (!res.ok) throw new Error(`POST ${path} -> ${res.status}`);
   const d = await res.json();
   if (d.status === "needs_confirmation") return { kind: "confirm", payload: d.payload };
-  return { kind: "reply", text: d.reply };
+  return { kind: "reply", text: d.reply, evidence: d.evidence };
 }
 
 export const coachChat = (thread_id: string, message: string) =>
