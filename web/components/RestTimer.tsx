@@ -46,8 +46,8 @@ export default function RestTimer({
       <p className="eyebrow mb-1.5">Rest</p>
       <p className="text-bone/80 text-sm mb-10">{exercise}</p>
 
-      <div className="relative">
-        <svg width="300" height="300" viewBox="0 0 300 300" className="-rotate-90">
+      <div className="relative w-[min(300px,72vw)]">
+        <svg viewBox="0 0 300 300" className="w-full h-auto -rotate-90">
           <circle cx="150" cy="150" r={R} fill="none" stroke="var(--color-line)" strokeWidth="7" />
           <circle
             cx="150"

@@ -176,7 +176,7 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
               <NumField label="Servings" value={servings} onChange={setServings} step={0.5} min={0.5} max={50} decimals={1} unit="×" />
               <div className="flex items-center gap-2">
                 <span className="text-dim text-xs shrink-0 w-20 pl-1">1 serving =</span>
-                <div className="flex-1"><NumField value={gPerServing} onChange={setGPerServing} step={5} min={1} max={2000} unit="g" compact /></div>
+                <div className="flex-1 min-w-0"><NumField value={gPerServing} onChange={setGPerServing} step={5} min={1} max={2000} unit="g" compact /></div>
               </div>
             </div>
           )}

@@ -169,11 +169,11 @@ export default function ProgramEditor() {
 
 function RepBox({ label, value, onDown, onUp }: { label: string; value: number; onDown: () => void; onUp: () => void }) {
   return (
-    <div className="field flex items-center flex-1 h-11">
-      <span className="pl-3 text-dim text-xs w-10">{label}</span>
-      <button onClick={onDown} className="w-9 h-11 text-xl text-dim active:text-volt">−</button>
-      <span className="flex-1 text-center font-display tnum font-bold">{value}</span>
-      <button onClick={onUp} className="w-9 h-11 text-xl text-dim active:text-volt rounded-r-[0.9rem]">+</button>
+    <div className="field flex items-center flex-1 min-w-0 overflow-hidden h-11">
+      <span className="pl-3 text-dim text-xs w-10 shrink-0">{label}</span>
+      <button onClick={onDown} className="w-9 h-11 text-xl text-dim active:text-volt shrink-0">−</button>
+      <span className="flex-1 min-w-0 text-center font-display tnum font-bold">{value}</span>
+      <button onClick={onUp} className="w-9 h-11 text-xl text-dim active:text-volt rounded-r-[0.9rem] shrink-0">+</button>
     </div>
   );
 }

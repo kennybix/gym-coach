@@ -132,9 +132,9 @@ export default function OnboardingFlow() {
             <div className="space-y-2.5">
               <p className="text-dim text-xs">Blood pressure</p>
               <div className="flex items-center gap-2">
-                <div className="flex-1"><NumField value={bSys} onChange={setBSys} step={1} min={50} max={260} unit="sys" compact /></div>
+                <div className="flex-1 min-w-0"><NumField value={bSys} onChange={setBSys} step={1} min={50} max={260} unit="sys" compact /></div>
                 <span className="text-dim text-lg">/</span>
-                <div className="flex-1"><NumField value={bDia} onChange={setBDia} step={1} min={30} max={160} unit="dia" compact /></div>
+                <div className="flex-1 min-w-0"><NumField value={bDia} onChange={setBDia} step={1} min={30} max={160} unit="dia" compact /></div>
               </div>
               <NumField label="Heart rate" value={bHr} onChange={setBHr} step={1} min={30} max={230} unit="bpm" />
             </div>
@@ -290,13 +290,13 @@ function Num({ label, unit, value, step, onChange }: { label: string; unit?: str
   return (
     <div>
       <p className="text-dim text-xs mb-2">{label}</p>
-      <div className="field flex items-center">
-        <button className="w-11 h-12 text-2xl text-dim active:text-volt rounded-l-[0.9rem]" onClick={() => onChange(+(value - step).toFixed(1))}>−</button>
-        <div className="flex-1 text-center">
+      <div className="field flex items-center min-w-0 overflow-hidden">
+        <button className="w-11 h-12 text-2xl text-dim active:text-volt rounded-l-[0.9rem] shrink-0" onClick={() => onChange(+(value - step).toFixed(1))}>−</button>
+        <div className="flex-1 min-w-0 text-center truncate">
           <span className="font-display tnum text-xl font-bold">{value}</span>
           {unit && <span className="text-dim text-xs ml-1">{unit}</span>}
         </div>
-        <button className="w-11 h-12 text-2xl text-dim active:text-volt rounded-r-[0.9rem]" onClick={() => onChange(+(value + step).toFixed(1))}>+</button>
+        <button className="w-11 h-12 text-2xl text-dim active:text-volt rounded-r-[0.9rem] shrink-0" onClick={() => onChange(+(value + step).toFixed(1))}>+</button>
       </div>
     </div>
   );

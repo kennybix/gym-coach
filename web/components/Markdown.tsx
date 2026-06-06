@@ -6,11 +6,13 @@ import remarkGfm from "remark-gfm";
    mapped explicitly (no typography plugin) so spacing/lists/bold match the rest of the UI. */
 export default function Markdown({ children }: { children: string }) {
   return (
-    <div className="text-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+    <div className="text-sm leading-relaxed break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           p: (p) => <p className="my-2" {...p} />,
+          pre: (p) => <pre className="my-2 overflow-x-auto rounded-lg bg-panel2 border border-line p-2.5 text-xs [&>code]:bg-transparent [&>code]:border-0 [&>code]:p-0" {...p} />,
+          table: (p) => <div className="overflow-x-auto my-2"><table className="w-full text-xs border-collapse [&_td]:border [&_th]:border [&_td]:border-line [&_th]:border-line [&_td]:px-2 [&_th]:px-2 [&_td]:py-1 [&_th]:py-1" {...p} /></div>,
           strong: (p) => <strong className="font-semibold text-bone" {...p} />,
           em: (p) => <em className="italic" {...p} />,
           ul: (p) => <ul className="list-disc pl-5 my-2 space-y-1" {...p} />,

@@ -429,14 +429,14 @@ function SlotCard({
                 <span className="text-dim tnum w-5 text-xs shrink-0">{i + 1}</span>
                 {cardio ? (
                   <>
-                    <div className="flex-1"><NumField value={eDur} onChange={setEDur} step={1} min={1} max={600} unit="min" compact /></div>
-                    <div className="flex-1"><NumField value={eDist} onChange={setEDist} step={0.1} min={0} max={300} decimals={1} unit="km" compact /></div>
+                    <div className="flex-1 min-w-0"><NumField value={eDur} onChange={setEDur} step={1} min={1} max={600} unit="min" compact /></div>
+                    <div className="flex-1 min-w-0"><NumField value={eDist} onChange={setEDist} step={0.1} min={0} max={300} decimals={1} unit="km" compact /></div>
                     <button onClick={() => { onEditSet(s, { durationS: Math.round(eDur * 60), distanceM: Math.round(eDist * 1000) }); setEditingId(null); }} className="btn btn-primary h-10 px-3 text-xs shrink-0">Save</button>
                   </>
                 ) : (
                   <>
-                    <div className="flex-1"><NumField value={eWeight} onChange={setEWeight} step={2.5} min={0} max={1000} decimals={1} unit="kg" compact /></div>
-                    <div className="flex-1"><NumField value={eReps} onChange={setEReps} step={1} min={1} max={100} unit="reps" compact /></div>
+                    <div className="flex-1 min-w-0"><NumField value={eWeight} onChange={setEWeight} step={2.5} min={0} max={1000} decimals={1} unit="kg" compact /></div>
+                    <div className="flex-1 min-w-0"><NumField value={eReps} onChange={setEReps} step={1} min={1} max={100} unit="reps" compact /></div>
                     <button onClick={() => { onEditSet(s, { reps: eReps, weightKg: eWeight }); setEditingId(null); }} className="btn btn-primary h-10 px-3 text-xs shrink-0">Save</button>
                   </>
                 )}

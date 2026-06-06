@@ -114,7 +114,7 @@ export default function TrendsView() {
           )}
         </div>
         <div className="flex items-stretch gap-2.5">
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <NumField value={weight} onChange={setWeight} step={0.5} min={0} max={500} decimals={1} unit="kg" />
           </div>
           <button onClick={saveWeight} className="btn btn-primary px-7">Save</button>

@@ -124,9 +124,9 @@ export default function VitalsCard({ delay = 0 }: { delay?: number }) {
 
       {logBP && (
         <div className="flex items-center gap-2 mb-2.5">
-          <div className="flex-1"><NumField value={sys} onChange={setSys} step={1} min={50} max={260} unit="sys" compact /></div>
+          <div className="flex-1 min-w-0"><NumField value={sys} onChange={setSys} step={1} min={50} max={260} unit="sys" compact /></div>
           <span className="text-dim text-lg">/</span>
-          <div className="flex-1"><NumField value={dia} onChange={setDia} step={1} min={30} max={160} unit="dia" compact /></div>
+          <div className="flex-1 min-w-0"><NumField value={dia} onChange={setDia} step={1} min={30} max={160} unit="dia" compact /></div>
         </div>
       )}
       {logHR && (
@@ -163,7 +163,7 @@ export default function VitalsCard({ delay = 0 }: { delay?: number }) {
                 <span className="font-display tnum text-lg font-bold shrink-0">
                   {hrSeries[hrSeries.length - 1]}<span className="text-dim text-xs ml-1">bpm</span>
                 </span>
-                <Spark values={hrSeries} stroke="var(--color-volt)" />
+                <div className="flex-1 min-w-0"><Spark values={hrSeries} stroke="var(--color-volt)" /></div>
               </div>
             </div>
           )}
@@ -174,7 +174,7 @@ export default function VitalsCard({ delay = 0 }: { delay?: number }) {
                 <span className="font-display tnum text-lg font-bold shrink-0">
                   {latestBP.systolic}/{latestBP.diastolic}
                 </span>
-                <Spark values={sysSeries} stroke="var(--color-bone)" />
+                <div className="flex-1 min-w-0"><Spark values={sysSeries} stroke="var(--color-bone)" /></div>
               </div>
             </div>
           )}
@@ -189,9 +189,9 @@ export default function VitalsCard({ delay = 0 }: { delay?: number }) {
               <li key={v.id} className="py-3 space-y-2">
                 {v.systolic != null && (
                   <div className="flex items-center gap-2">
-                    <div className="flex-1"><NumField value={eSys} onChange={setESys} step={1} min={50} max={260} unit="sys" compact /></div>
+                    <div className="flex-1 min-w-0"><NumField value={eSys} onChange={setESys} step={1} min={50} max={260} unit="sys" compact /></div>
                     <span className="text-dim">/</span>
-                    <div className="flex-1"><NumField value={eDia} onChange={setEDia} step={1} min={30} max={160} unit="dia" compact /></div>
+                    <div className="flex-1 min-w-0"><NumField value={eDia} onChange={setEDia} step={1} min={30} max={160} unit="dia" compact /></div>
                   </div>
                 )}
                 {v.heart_rate != null && (
@@ -237,8 +237,9 @@ function Spark({ values, stroke, w = 110, h = 30 }: { values: number[]; stroke: 
   const x = (i: number) => (i / (values.length - 1)) * (w - 2) + 1;
   const y = (v: number) => h - 3 - ((v - lo) / span) * (h - 6);
   const d = values.map((v, i) => `${i ? "L" : "M"} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+  // Responsive: fill the container width via viewBox so the line never spills out of its box.
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0">
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" className="block w-full h-auto">
       <path d={d} fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx={x(values.length - 1)} cy={y(values[values.length - 1])} r="2.5" fill={stroke} />
     </svg>

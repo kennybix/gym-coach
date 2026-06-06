@@ -46,8 +46,8 @@ export default function NumField({
   const btn = compact ? "w-9 h-10 text-xl" : "w-12 h-14 text-2xl";
   const num = compact ? "text-lg" : "text-2xl";
   return (
-    <div className="field flex items-center">
-      {label && <span className="pl-4 text-dim text-sm w-20 shrink-0">{label}</span>}
+    <div className="field flex items-center min-w-0 overflow-hidden">
+      {label && <span className="pl-4 text-dim text-sm w-20 shrink-0 truncate">{label}</span>}
       <button
         type="button"
         aria-label="decrease"
@@ -56,7 +56,7 @@ export default function NumField({
       >
         −
       </button>
-      <div className="flex-1 flex items-baseline justify-center gap-1 min-w-0">
+      <div className="flex-1 min-w-0 flex items-baseline justify-center gap-1 px-1">
         <input
           value={text}
           inputMode="decimal"
@@ -76,9 +76,9 @@ export default function NumField({
             focused.current = false;
             setText(fmt(value, decimals));
           }}
-          className={`bg-transparent text-center font-display tnum ${num} font-bold w-[5ch] outline-none`}
+          className={`min-w-0 flex-1 bg-transparent text-center font-display tnum ${num} font-bold outline-none`}
         />
-        {unit && <span className="text-dim text-xs shrink-0">{unit}</span>}
+        {unit && <span className="text-dim text-[11px] shrink-0">{unit}</span>}
       </div>
       <button
         type="button"

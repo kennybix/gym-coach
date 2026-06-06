@@ -337,7 +337,7 @@ function Bubble({ role, text }: { role: Msg["role"]; text: string }) {
   return (
     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[84%] px-4 py-2.5 text-sm leading-relaxed ${
+        className={`max-w-[84%] min-w-0 break-words px-4 py-2.5 text-sm leading-relaxed ${
           mine
             ? "bg-volt text-ink rounded-2xl rounded-br-md font-medium"
             : "card rounded-2xl rounded-bl-md text-bone/90"

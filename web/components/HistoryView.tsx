@@ -156,8 +156,8 @@ function SessionCard({
                   editing === set.id && set.duration_s == null ? (
                     <li key={set.id} className="flex items-center gap-2">
                       <span className="text-dim tnum w-5 text-xs shrink-0">{i + 1}</span>
-                      <div className="flex-1"><NumField value={eWeight} onChange={setEWeight} step={2.5} min={0} max={1000} decimals={1} unit="kg" compact /></div>
-                      <div className="flex-1"><NumField value={eReps} onChange={setEReps} step={1} min={1} max={100} unit="reps" compact /></div>
+                      <div className="flex-1 min-w-0"><NumField value={eWeight} onChange={setEWeight} step={2.5} min={0} max={1000} decimals={1} unit="kg" compact /></div>
+                      <div className="flex-1 min-w-0"><NumField value={eReps} onChange={setEReps} step={1} min={1} max={100} unit="reps" compact /></div>
                       <button onClick={() => saveEdit(set)} className="btn btn-primary h-10 px-3 text-xs shrink-0">Save</button>
                       <button onClick={cancelEdit} aria-label="cancel" className="text-dim px-1.5 text-base shrink-0">×</button>
                     </li>
