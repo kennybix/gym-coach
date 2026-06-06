@@ -8,7 +8,7 @@ import { apiGet, configured } from "@/lib/api";
 import { enqueue } from "@/lib/queue";
 import NumField from "./NumField";
 
-type HSet = { id: string; exercise_id: string; name: string; reps: number | null; weight_kg: number | null; duration_s: number | null; distance_m: number | null; logged_at: string };
+type HSet = { id: string; exercise_id: string; name: string; reps: number | null; weight_kg: number | null; rpe: number | null; set_type: string | null; duration_s: number | null; distance_m: number | null; logged_at: string };
 type HSession = { session_id: string; started_at: string; completed_at: string | null; sets: HSet[] };
 
 function fmtSet(s: HSet): string {
@@ -16,7 +16,9 @@ function fmtSet(s: HSet): string {
     const km = s.distance_m ? ` · ${(s.distance_m / 1000).toFixed(1)} km` : "";
     return `${Math.round(s.duration_s / 60)} min${km}`;
   }
-  return `${s.weight_kg ?? "—"} kg × ${s.reps ?? "—"}`;
+  const tag = s.set_type && s.set_type !== "normal" ? ` (${s.set_type})` : "";
+  const rpe = s.rpe != null ? ` · RPE ${s.rpe}` : "";
+  return `${s.weight_kg ?? "—"} kg × ${s.reps ?? "—"}${rpe}${tag}`;
 }
 
 function prettyDate(iso: string) {

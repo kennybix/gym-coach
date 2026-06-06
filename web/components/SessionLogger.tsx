@@ -16,8 +16,9 @@ import RestTimer from "./RestTimer";
 type LoggedSet = {
   id: string; slotId: string; exerciseId: string;
   reps?: number; weightKg?: number; durationS?: number; distanceM?: number;
+  rpe?: number | null; setType?: string | null;
 };
-type LogPayload = { reps?: number; weightKg?: number; durationS?: number; distanceM?: number };
+type LogPayload = { reps?: number; weightKg?: number; durationS?: number; distanceM?: number; rpe?: number | null; setType?: string | null };
 type Session = { id: string; startedAt: string; logged: LoggedSet[]; adhoc: ProgramSlot[] };
 
 const SKEY = "active_session_v2";
@@ -130,6 +131,7 @@ export default function SessionLogger() {
         sets: [{
           id: setId, exercise_id: slot.exercise_id,
           reps: p.reps ?? null, weight_kg: p.weightKg ?? null,
+          rpe: p.rpe ?? null, set_type: p.setType ?? null,
           duration_s: p.durationS ?? null, distance_m: p.distanceM ?? null,
           logged_at: new Date().toISOString(),
         }],
@@ -365,6 +367,10 @@ function SlotCard({
   const [eDur, setEDur] = useState(20);
   const [eDist, setEDist] = useState(0);
   const [showCues, setShowCues] = useState(false);
+  // optional per-set tagging (strength only) — kept behind a toggle so the one-tap path stays clean
+  const [rpe, setRpe] = useState<number | null>(null);
+  const [setType, setSetType] = useState<string>("normal");
+  const [showTag, setShowTag] = useState(false);
 
   const planned = slot.sets ?? 0;
   const loggedCount = loggedSets.length;
@@ -447,6 +453,10 @@ function SlotCard({
                 <span className="text-dim tnum w-5 text-xs">{i + 1}</span>
                 <button onClick={() => startEdit(s)} className="tnum text-bone/90 text-left active:text-volt">
                   {cardio ? fmtCardio(s) : <>{s.weightKg} kg <span className="text-dim">×</span> {s.reps}</>}
+                  {!cardio && s.setType && s.setType !== "normal" && (
+                    <span className="text-dim text-[10px] uppercase ml-1.5">{s.setType}</span>
+                  )}
+                  {!cardio && s.rpe != null && <span className="text-dim text-xs ml-1.5">RPE {s.rpe}</span>}
                   <span className="text-dim text-xs ml-2">edit</span>
                 </button>
                 <button onClick={() => onRemoveSet(s)} aria-label="remove entry" className="ml-auto text-dim hover:text-alert px-2 text-base leading-none">×</button>
@@ -480,12 +490,39 @@ function SlotCard({
           </button>
         </div>
       ) : (
-        <div className="border-t border-line p-3 grid grid-cols-[1fr_1fr_auto] gap-2.5">
-          <NumField value={weight} onChange={setWeight} step={2.5} min={0} max={1000} decimals={1} unit="kg" />
-          <NumField value={reps} onChange={setReps} step={1} min={1} max={100} unit="reps" />
-          <button onClick={() => onLog(slot, { reps, weightKg: weight })} className="btn btn-primary px-5">
-            {loggedCount > 0 ? "+ Set" : "Log"}
+        <div className="border-t border-line p-3 space-y-2.5">
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-2.5">
+            <NumField value={weight} onChange={setWeight} step={2.5} min={0} max={1000} decimals={1} unit="kg" />
+            <NumField value={reps} onChange={setReps} step={1} min={1} max={100} unit="reps" />
+            <button
+              onClick={() => onLog(slot, { reps, weightKg: weight, rpe, setType: setType !== "normal" ? setType : null })}
+              className="btn btn-primary px-5"
+            >
+              {loggedCount > 0 ? "+ Set" : "Log"}
+            </button>
+          </div>
+          <button onClick={() => setShowTag((v) => !v)} className="text-xs text-dim active:text-volt">
+            {setType !== "normal" || rpe != null
+              ? `Tagged: ${setType !== "normal" ? setType : ""}${setType !== "normal" && rpe != null ? " · " : ""}${rpe != null ? `RPE ${rpe}` : ""}`
+              : "+ RPE / set type"}
           </button>
+          {showTag && (
+            <div className="flex flex-wrap gap-1.5">
+              {["normal", "warmup", "drop", "failure"].map((t) => (
+                <button key={t} onClick={() => setSetType(t)}
+                  className={`chip px-2.5 py-1 text-[11px] capitalize ${setType === t ? "border-volt text-volt bg-volt/10" : "text-dim"}`}>
+                  {t}
+                </button>
+              ))}
+              <span className="w-px self-stretch bg-line mx-1" />
+              {[6, 7, 8, 9, 10].map((n) => (
+                <button key={n} onClick={() => setRpe(rpe === n ? null : n)}
+                  className={`chip px-2.5 py-1 text-[11px] tnum ${rpe === n ? "border-volt text-volt bg-volt/10" : "text-dim"}`}>
+                  RPE {n}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </section>

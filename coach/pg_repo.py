@@ -369,13 +369,13 @@ class PostgresCoachRepo:
                     status = await con.execute(
                         """
                         insert into set_logs (id, session_id, user_id, exercise_id,
-                                              reps, weight_kg, rpe, logged_at, duration_s, distance_m)
-                        values ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10)
+                                              reps, weight_kg, rpe, logged_at, duration_s, distance_m, set_type)
+                        values ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11)
                         on conflict (id) do nothing
                         """,
                         s["id"], session_id, user_id, s["exercise_id"],
                         s.get("reps"), s.get("weight_kg"), s.get("rpe"), s["logged_at"],
-                        s.get("duration_s"), s.get("distance_m"),
+                        s.get("duration_s"), s.get("distance_m"), s.get("set_type"),
                     )
                     inserted += int(status.rsplit(" ", 1)[-1])
         return inserted
@@ -391,13 +391,16 @@ class PostgresCoachRepo:
         return int(status.rsplit(" ", 1)[-1])
 
     async def update_set_log(self, user_id: str, session_id: str, set_id: str,
-                             reps, weight_kg, duration_s=None, distance_m=None) -> int:
+                             reps, weight_kg, duration_s=None, distance_m=None,
+                             rpe=None, set_type=None) -> int:
         """Edit a logged set in place (reps/weight for strength, duration/distance for cardio),
-        scoped to the owner's session. Idempotent; returns rows affected (0 if gone)."""
+        scoped to the owner's session. rpe/set_type only change when provided (COALESCE), so a
+        plain reps/weight edit doesn't wipe a tag. Idempotent; returns rows affected (0 if gone)."""
         status = await self._pool.execute(
-            """update set_logs set reps = $4, weight_kg = $5, duration_s = $6, distance_m = $7
+            """update set_logs set reps = $4, weight_kg = $5, duration_s = $6, distance_m = $7,
+                                   rpe = coalesce($8, rpe), set_type = coalesce($9, set_type)
                where id = $1::uuid and user_id = $2::uuid and session_id = $3::uuid""",
-            set_id, user_id, session_id, reps, weight_kg, duration_s, distance_m,
+            set_id, user_id, session_id, reps, weight_kg, duration_s, distance_m, rpe, set_type,
         )
         return int(status.rsplit(" ", 1)[-1])
 
@@ -422,7 +425,8 @@ class PostgresCoachRepo:
             return []
         ids = [s["session_id"] for s in sessions]
         rows = await self._pool.fetch(
-            """select id, session_id, exercise_id, reps, weight_kg, duration_s, distance_m, logged_at
+            """select id, session_id, exercise_id, reps, weight_kg, rpe, set_type,
+                      duration_s, distance_m, logged_at
                from set_logs where user_id = $1::uuid and session_id = any($2::uuid[])
                order by logged_at""",
             user_id, ids,
@@ -435,6 +439,8 @@ class PostgresCoachRepo:
                 "name": self._catalog.name_of(r["exercise_id"]),
                 "reps": r["reps"],
                 "weight_kg": float(r["weight_kg"]) if r["weight_kg"] is not None else None,
+                "rpe": float(r["rpe"]) if r["rpe"] is not None else None,
+                "set_type": r["set_type"],
                 "duration_s": r["duration_s"],
                 "distance_m": r["distance_m"],
                 "logged_at": r["logged_at"].isoformat(),

@@ -57,6 +57,7 @@ class SetIn(BaseModel):
     reps: Optional[int] = None
     weight_kg: Optional[float] = None
     rpe: Optional[float] = None
+    set_type: Optional[str] = None     # normal (default) | warmup | drop | failure
     duration_s: Optional[int] = None   # cardio: seconds
     distance_m: Optional[int] = None   # cardio: meters
     logged_at: datetime
@@ -93,6 +94,8 @@ class SetUpdateIn(BaseModel):
     set_id: str
     reps: Optional[int] = None
     weight_kg: Optional[float] = None
+    rpe: Optional[float] = None
+    set_type: Optional[str] = None
     duration_s: Optional[int] = None
     distance_m: Optional[int] = None
 
@@ -103,7 +106,7 @@ async def sets_update(body: SetUpdateIn, user_id: str = Depends(get_current_user
     so it's safe to replay through the offline queue. Scoped to the caller's own session."""
     updated = await _repo.update_set_log(
         user_id, body.session_id, body.set_id, body.reps, body.weight_kg,
-        body.duration_s, body.distance_m,
+        body.duration_s, body.distance_m, body.rpe, body.set_type,
     )
     return {"status": "ok", "updated": updated}
 
