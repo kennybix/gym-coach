@@ -51,6 +51,19 @@ export type ProgramSlot = {
   position: number;
 };
 
+export type ExerciseStats = {
+  exercise_id: string;
+  name: string;
+  best_e1rm: number | null;
+  heaviest_kg: number | null;
+  total_sets: number;
+  total_volume: number;
+  best_set: { weight_kg: number; reps: number; e1rm: number } | null;
+  series: { date: string; e1rm: number; top_weight: number; volume: number }[];
+};
+export const exerciseStats = (id: string) =>
+  apiGet<ExerciseStats>(`/api/exercise/${encodeURIComponent(id)}/stats`);
+
 /* ---- coach endpoints (separate from /api; may be 503 if no LLM configured) ---- */
 export type CoachReply =
   | { kind: "reply"; text: string }

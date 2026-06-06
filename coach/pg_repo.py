@@ -459,6 +459,53 @@ class PostgresCoachRepo:
             })
         return out
 
+    async def get_exercise_stats(self, user_id: str, exercise_id: str) -> dict:
+        """Per-exercise progression: lifetime bests + a per-session series (top estimated-1RM,
+        top weight, volume). e1RM uses Epley: weight*(1+reps/30). Strength sets only."""
+        E1RM = "weight_kg * (1 + reps / 30.0)"
+        agg = await self._pool.fetchrow(
+            f"""select max({E1RM}) as best_e1rm, max(weight_kg) as heaviest_kg,
+                       count(*) as total_sets, coalesce(sum(weight_kg * reps), 0) as total_volume
+                from set_logs
+                where user_id = $1::uuid and exercise_id = $2
+                  and weight_kg is not null and reps is not null""",
+            user_id, exercise_id,
+        )
+        best = await self._pool.fetchrow(
+            f"""select weight_kg, reps, {E1RM} as e1rm from set_logs
+                where user_id = $1::uuid and exercise_id = $2
+                  and weight_kg is not null and reps is not null
+                order by e1rm desc limit 1""",
+            user_id, exercise_id,
+        )
+        rows = await self._pool.fetch(
+            f"""select coalesce(s.completed_at, s.started_at)::date as date,
+                       max({E1RM}) as e1rm, max(sl.weight_kg) as top_weight,
+                       sum(sl.weight_kg * sl.reps) as volume
+                from set_logs sl join sessions s on s.session_id = sl.session_id
+                where sl.user_id = $1::uuid and sl.exercise_id = $2
+                  and sl.weight_kg is not null and sl.reps is not null
+                group by date order by date""",
+            user_id, exercise_id,
+        )
+        return {
+            "exercise_id": exercise_id,
+            "name": self._catalog.name_of(exercise_id),
+            "best_e1rm": round(float(agg["best_e1rm"]), 1) if agg["best_e1rm"] is not None else None,
+            "heaviest_kg": float(agg["heaviest_kg"]) if agg["heaviest_kg"] is not None else None,
+            "total_sets": agg["total_sets"] or 0,
+            "total_volume": round(float(agg["total_volume"] or 0)),
+            "best_set": (
+                {"weight_kg": float(best["weight_kg"]), "reps": best["reps"],
+                 "e1rm": round(float(best["e1rm"]), 1)} if best else None
+            ),
+            "series": [
+                {"date": r["date"].isoformat(), "e1rm": round(float(r["e1rm"]), 1),
+                 "top_weight": float(r["top_weight"]), "volume": round(float(r["volume"] or 0))}
+                for r in rows
+            ],
+        }
+
     # --- trends (weight series for charting + idempotent weight logging) ------
     async def get_weight_series(self, user_id: str, window_days: int) -> list[dict]:
         """Daily-averaged weight points for the trend chart (smooths intra-day noise)."""

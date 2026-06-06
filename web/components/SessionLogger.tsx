@@ -5,10 +5,11 @@
  * start/end frames. Every write goes through the offline queue; set ids are client-generated. */
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { apiGet, configured, type ProgramSlot } from "@/lib/api";
+import { apiGet, configured, exerciseStats, type ProgramSlot } from "@/lib/api";
 import { enqueue, installQueueAutoFlush, subscribeQueue } from "@/lib/queue";
 import CatalogSearch, { type CatalogRow } from "./CatalogSearch";
 import ExerciseAnimation from "./ExerciseAnimation";
+import ExerciseDetail from "./ExerciseDetail";
 import InsightCard from "./InsightCard";
 import NumField from "./NumField";
 import RestTimer from "./RestTimer";
@@ -371,6 +372,30 @@ function SlotCard({
   const [rpe, setRpe] = useState<number | null>(null);
   const [setType, setSetType] = useState<string>("normal");
   const [showTag, setShowTag] = useState(false);
+  // PR detection (B2) + exercise detail (B3)
+  const [bestE1rm, setBestE1rm] = useState<number | null>(null);
+  const [pr, setPr] = useState<string | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
+
+  // load the lifetime best est-1RM once a session is active, so we can flag PRs as they happen
+  useEffect(() => {
+    if (!active || cardio) return;
+    let live = true;
+    exerciseStats(slot.exercise_id).then((s) => { if (live) setBestE1rm(s.best_e1rm); }).catch(() => {});
+    return () => { live = false; };
+  }, [active, cardio, slot.exercise_id]);
+
+  const logStrength = () => {
+    if (weight > 0 && reps > 0) {
+      const e1rm = weight * (1 + reps / 30);
+      if (bestE1rm == null || e1rm > bestE1rm + 0.05) {
+        setBestE1rm(e1rm);
+        setPr(`New best · est. 1RM ${Math.round(e1rm)} kg`);
+        setTimeout(() => setPr(null), 4000);
+      }
+    }
+    onLog(slot, { reps, weightKg: weight, rpe, setType: setType !== "normal" ? setType : null });
+  };
 
   const planned = slot.sets ?? 0;
   const loggedCount = loggedSets.length;
@@ -406,15 +431,32 @@ function SlotCard({
       style={{ animationDelay: `${80 + index * 55}ms` }}
     >
       <div className="flex gap-3.5 p-4">
-        <ExerciseAnimation frames={slot.image_urls} alt={slot.name} className="w-[72px] h-[72px] rounded-xl shrink-0 border border-line" />
+        {cardio ? (
+          <ExerciseAnimation frames={slot.image_urls} alt={slot.name} className="w-[72px] h-[72px] rounded-xl shrink-0 border border-line" />
+        ) : (
+          <button onClick={() => setShowDetail(true)} aria-label={`${slot.name} progression`} className="shrink-0">
+            <ExerciseAnimation frames={slot.image_urls} alt={slot.name} className="w-[72px] h-[72px] rounded-xl border border-line" />
+          </button>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h2 className="font-display font-semibold leading-tight">{slot.name}</h2>
-            {done && <span className="chip px-2 py-0.5 text-[10px] font-semibold text-volt border-volt/40 shrink-0">Done</span>}
+            {cardio ? (
+              <h2 className="font-display font-semibold leading-tight">{slot.name}</h2>
+            ) : (
+              <button onClick={() => setShowDetail(true)} className="text-left active:text-volt">
+                <h2 className="font-display font-semibold leading-tight">{slot.name}</h2>
+              </button>
+            )}
+            {pr ? (
+              <span className="chip px-2 py-0.5 text-[10px] font-semibold text-ink bg-volt border-volt shrink-0">PR</span>
+            ) : done ? (
+              <span className="chip px-2 py-0.5 text-[10px] font-semibold text-volt border-volt/40 shrink-0">Done</span>
+            ) : null}
           </div>
           <p className="text-dim text-xs mt-1 capitalize">
             {slot.equipment}
             {cardio ? " · cardio" : planned ? ` · target ${slot.sets} × ${slot.reps}` : " · added today"}
+            {!cardio && bestE1rm != null && <span className="normal-case"> · best {Math.round(bestE1rm)} kg e1RM</span>}
           </p>
           {!cardio && (planned > 0 || loggedCount > 0) && (
             <div className="flex gap-1.5 mt-2.5">
@@ -494,13 +536,11 @@ function SlotCard({
           <div className="grid grid-cols-[1fr_1fr_auto] gap-2.5">
             <NumField value={weight} onChange={setWeight} step={2.5} min={0} max={1000} decimals={1} unit="kg" />
             <NumField value={reps} onChange={setReps} step={1} min={1} max={100} unit="reps" />
-            <button
-              onClick={() => onLog(slot, { reps, weightKg: weight, rpe, setType: setType !== "normal" ? setType : null })}
-              className="btn btn-primary px-5"
-            >
+            <button onClick={logStrength} className="btn btn-primary px-5">
               {loggedCount > 0 ? "+ Set" : "Log"}
             </button>
           </div>
+          {pr && <p className="text-volt text-xs font-semibold">🎉 {pr}</p>}
           <button onClick={() => setShowTag((v) => !v)} className="text-xs text-dim active:text-volt">
             {setType !== "normal" || rpe != null
               ? `Tagged: ${setType !== "normal" ? setType : ""}${setType !== "normal" && rpe != null ? " · " : ""}${rpe != null ? `RPE ${rpe}` : ""}`
@@ -525,6 +565,15 @@ function SlotCard({
           )}
         </div>
       ))}
+
+      {showDetail && (
+        <ExerciseDetail
+          exerciseId={slot.exercise_id}
+          name={slot.name}
+          frames={slot.image_urls}
+          onClose={() => setShowDetail(false)}
+        />
+      )}
     </section>
   );
 }

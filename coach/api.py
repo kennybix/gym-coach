@@ -128,6 +128,13 @@ async def session_history(limit: int = 30, user_id: str = Depends(get_current_us
     return {"sessions": await _repo.get_session_history(user_id, limit)}
 
 
+@router.get("/exercise/{exercise_id}/stats")
+async def exercise_stats(exercise_id: str, user_id: str = Depends(get_current_user_id)):
+    """Per-exercise progression: lifetime bests (est-1RM, heaviest, volume) + a per-session
+    series for charting. Powers PR detection on Today and the exercise detail view."""
+    return await _repo.get_exercise_stats(user_id, exercise_id)
+
+
 @router.get("/export")
 async def export_data(user_id: str = Depends(get_current_user_id)):
     """Full export of the user's own data (weight, nutrition, workouts, vitals, program,
