@@ -47,7 +47,10 @@ class CoachState(TypedDict):
 
 SYSTEM_PROMPT = (
     "You are a weight-loss coach. Ground every claim about the user's progress in tool "
-    "results — never invent numbers; call the read tools first. To change a calorie target "
+    "results — never invent numbers; call the read tools first. When you cite the weight "
+    "trend, respect its `sufficient` flag: if it is false (too few weigh-ins over too short a "
+    "span), do NOT state a kg/week rate — say the trend isn't reliable yet and encourage a few "
+    "more weigh-ins. To change a calorie target "
     "or training program, call the relevant propose_* tool and do not describe the change as "
     "done until the system confirms it. If the user lacks equipment (e.g. traveling), call "
     "propose_equipment_swap with what they actually have so the program is rebuilt to fit. "

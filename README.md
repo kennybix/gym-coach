@@ -46,6 +46,11 @@ phone privately over Tailscale.
 > **New here (human or agent)?** Read [`docs/SYSTEM_OVERVIEW.md`](docs/SYSTEM_OVERVIEW.md) —
 > the full architecture, services/ports, LLM wiring, phone deploy, and an operations cookbook.
 > Then [`CLAUDE.md`](CLAUDE.md) for the architectural + safety invariants.
+>
+> Product/readiness notes:
+> [`docs/product-capability-review-2026-06-06.md`](docs/product-capability-review-2026-06-06.md),
+> [`docs/product-readiness-review-2026-06-05.md`](docs/product-readiness-review-2026-06-05.md),
+> [`docs/engineering-review-2026-06-05.md`](docs/engineering-review-2026-06-05.md).
 
 ## Run it locally
 

@@ -101,6 +101,7 @@ class PostgresCoachRepo:
                 count(*)                                                   as n,
                 (array_agg(weight_kg order by recorded_at asc))[1]         as start_kg,
                 (array_agg(weight_kg order by recorded_at desc))[1]        as latest_kg,
+                coalesce(max(recorded_at)::date - min(recorded_at)::date, 0) as span_days,
                 regr_slope(weight_kg, extract(epoch from recorded_at)/86400.0) as slope_per_day
             from body_metrics
             where user_id = $1::uuid
@@ -111,12 +112,19 @@ class PostgresCoachRepo:
             window_days,
         )
         slope = row["slope_per_day"]
+        n = row["n"] or 0
+        span_days = int(row["span_days"] or 0)
+        # A trustworthy weekly rate needs enough readings spread over enough time;
+        # below this the UI/coach must not state a kg/wk figure.
+        sufficient = n >= 4 and span_days >= 14
         return WeightTrend(
             window_days=window_days,
             start_kg=float(row["start_kg"]) if row["start_kg"] is not None else None,
             latest_kg=float(row["latest_kg"]) if row["latest_kg"] is not None else None,
             smoothed_slope_kg_per_week=float(slope) * 7 if slope is not None else None,
-            n_points=row["n"] or 0,
+            n_points=n,
+            span_days=span_days,
+            sufficient=sufficient,
         )
 
     # --- adherence (prescribed vs actual) ------------------------------------

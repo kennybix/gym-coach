@@ -46,6 +46,10 @@ class WeightTrend(BaseModel):
     latest_kg: Optional[float]
     smoothed_slope_kg_per_week: Optional[float]
     n_points: int
+    span_days: int = 0          # days between first and last weigh-in in the window
+    # A weekly rate is only trustworthy with enough readings over enough time. Below this,
+    # the UI/coach must NOT state a kg/wk figure (a couple of weigh-ins can imply absurd rates).
+    sufficient: bool = False
 
 
 class AdherenceSummary(BaseModel):

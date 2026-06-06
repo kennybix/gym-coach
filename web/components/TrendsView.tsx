@@ -15,6 +15,8 @@ type Trends = {
     latest_kg: number | null;
     smoothed_slope_kg_per_week: number | null;
     n_points: number;
+    span_days: number;
+    sufficient: boolean;
   };
   adherence: {
     sessions_prescribed: number;
@@ -76,12 +78,15 @@ export default function TrendsView() {
     return <Wrap><div className="card p-5 h-40 animate-pulse" /></Wrap>;
 
   const slope = data.trend.smoothed_slope_kg_per_week;
+  // Only show a direction + weekly rate once there's enough data; a couple of weigh-ins
+  // can imply absurd rates (e.g. "15.9 kg/wk"). Until then, show calmer "building" copy.
+  const trustworthy = data.trend.sufficient && slope != null;
   const dir =
-    slope == null ? { label: "—", tone: "text-dim" }
-    : slope < -0.05 ? { label: "Trending down", tone: "text-volt" }
-    : slope > 0.05 ? { label: "Trending up", tone: "text-alert" }
+    !trustworthy ? { label: "Building trend", tone: "text-dim" }
+    : slope! < -0.05 ? { label: "Trending down", tone: "text-volt" }
+    : slope! > 0.05 ? { label: "Trending up", tone: "text-alert" }
     : { label: "Holding", tone: "text-dim" };
-  const rate = slope == null ? null : `${Math.abs(slope).toFixed(1)} kg/wk`;
+  const rate = trustworthy ? `${Math.abs(slope!).toFixed(1)} kg/wk · ${data.trend.span_days}d` : null;
 
   const isToday = selected === todayISO();
   const hasEntry = data.weight_series.some((p) => p.date === selected);
@@ -103,7 +108,11 @@ export default function TrendsView() {
           </span>
         </div>
         <WeightChart series={data.weight_series} goalKg={data.goal_weight_kg} selectedDate={selected} onSelect={setSelected} />
-        <p className="text-dim text-xs mt-2 text-center">Tap a point on the line to edit or remove that weigh-in.</p>
+        <p className="text-dim text-xs mt-2 text-center">
+          {trustworthy
+            ? "Tap a point on the line to edit or remove that weigh-in."
+            : "A few more weigh-ins over 2+ weeks and I'll show a reliable rate. Tap a point to edit it."}
+        </p>
       </Card>
 
       <Card delay={180}>
