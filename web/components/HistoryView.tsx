@@ -8,8 +8,16 @@ import { apiGet, configured } from "@/lib/api";
 import { enqueue } from "@/lib/queue";
 import NumField from "./NumField";
 
-type HSet = { id: string; exercise_id: string; name: string; reps: number | null; weight_kg: number | null; logged_at: string };
+type HSet = { id: string; exercise_id: string; name: string; reps: number | null; weight_kg: number | null; duration_s: number | null; distance_m: number | null; logged_at: string };
 type HSession = { session_id: string; started_at: string; completed_at: string | null; sets: HSet[] };
+
+function fmtSet(s: HSet): string {
+  if (s.duration_s != null) {
+    const km = s.distance_m ? ` · ${(s.distance_m / 1000).toFixed(1)} km` : "";
+    return `${Math.round(s.duration_s / 60)} min${km}`;
+  }
+  return `${s.weight_kg ?? "—"} kg × ${s.reps ?? "—"}`;
+}
 
 function prettyDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
@@ -145,7 +153,7 @@ function SessionCard({
               <p className="text-sm font-medium text-bone/90 mb-1.5">{g.name}</p>
               <ul className="space-y-1.5">
                 {g.sets.map((set, i) =>
-                  editing === set.id ? (
+                  editing === set.id && set.duration_s == null ? (
                     <li key={set.id} className="flex items-center gap-2">
                       <span className="text-dim tnum w-5 text-xs shrink-0">{i + 1}</span>
                       <div className="flex-1"><NumField value={eWeight} onChange={setEWeight} step={2.5} min={0} max={1000} decimals={1} unit="kg" compact /></div>
@@ -156,10 +164,13 @@ function SessionCard({
                   ) : (
                     <li key={set.id} className="flex items-center gap-2 text-sm">
                       <span className="text-dim tnum w-5 text-xs">{i + 1}</span>
-                      <button onClick={() => startEdit(set)} className="tnum text-bone/90 text-left active:text-volt">
-                        {set.weight_kg ?? "—"} kg <span className="text-dim">×</span> {set.reps ?? "—"}
-                        <span className="text-dim text-xs ml-2">edit</span>
-                      </button>
+                      {set.duration_s == null ? (
+                        <button onClick={() => startEdit(set)} className="tnum text-bone/90 text-left active:text-volt">
+                          {fmtSet(set)}<span className="text-dim text-xs ml-2">edit</span>
+                        </button>
+                      ) : (
+                        <span className="tnum text-bone/90">{fmtSet(set)}</span>
+                      )}
                       <button onClick={() => removeSet(set.id)} aria-label="remove set" className="ml-auto text-dim hover:text-alert px-2 text-base leading-none">×</button>
                     </li>
                   )

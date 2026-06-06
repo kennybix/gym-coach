@@ -1,22 +1,28 @@
 "use client";
 /* The gym-floor screen. One-handed, glanceable, dim rooms, sweaty thumbs.
- * Now supports: editing the program, adding exercises ad-hoc for today, logging
- * multiple sets per exercise, and removing a mis-logged set. Every write goes through
- * the offline queue (lib/queue.ts); set ids are client-generated so deletes are safe. */
+ * Strength exercises log sets of weight×reps; CARDIO exercises (catalog category 'cardio',
+ * e.g. treadmill) log time + distance instead. Exercises animate by cross-fading their
+ * start/end frames. Every write goes through the offline queue; set ids are client-generated. */
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { apiGet, configured, type ProgramSlot } from "@/lib/api";
 import { enqueue, installQueueAutoFlush, subscribeQueue } from "@/lib/queue";
 import CatalogSearch, { type CatalogRow } from "./CatalogSearch";
+import ExerciseAnimation from "./ExerciseAnimation";
 import InsightCard from "./InsightCard";
 import NumField from "./NumField";
 import RestTimer from "./RestTimer";
 
-type LoggedSet = { id: string; slotId: string; exerciseId: string; reps: number; weightKg: number };
+type LoggedSet = {
+  id: string; slotId: string; exerciseId: string;
+  reps?: number; weightKg?: number; durationS?: number; distanceM?: number;
+};
+type LogPayload = { reps?: number; weightKg?: number; durationS?: number; distanceM?: number };
 type Session = { id: string; startedAt: string; logged: LoggedSet[]; adhoc: ProgramSlot[] };
 
 const SKEY = "active_session_v2";
 const REST_SECONDS = 90;
+const isCardio = (s: ProgramSlot) => s.category === "cardio";
 
 function loadSession(): Session | null {
   try {
@@ -39,10 +45,11 @@ function adhocSlot(r: CatalogRow): ProgramSlot {
     exercise_id: r.exercise_id,
     name: r.name,
     equipment: r.equipment,
+    category: r.category ?? null,
     sets: null,
     reps: null,
     load_kg: null,
-    image_urls: [],
+    image_urls: r.image_urls ?? [],
     cues: [],
     position: 999,
   };
@@ -113,23 +120,31 @@ export default function SessionLogger() {
   );
 
   const logSet = useCallback(
-    (slot: ProgramSlot, reps: number, weightKg: number) => {
+    (slot: ProgramSlot, p: LogPayload) => {
       if (!session) return;
       const setId = crypto.randomUUID();
-      const entry: LoggedSet = { id: setId, slotId: slot.program_exercise_id, exerciseId: slot.exercise_id, reps, weightKg };
+      const entry: LoggedSet = { id: setId, slotId: slot.program_exercise_id, exerciseId: slot.exercise_id, ...p };
       persist({ ...session, logged: [...session.logged, entry] });
       void enqueue("/api/sets/sync", {
         session_id: session.id,
-        sets: [{ id: setId, exercise_id: slot.exercise_id, reps, weight_kg: weightKg, logged_at: new Date().toISOString() }],
+        sets: [{
+          id: setId, exercise_id: slot.exercise_id,
+          reps: p.reps ?? null, weight_kg: p.weightKg ?? null,
+          duration_s: p.durationS ?? null, distance_m: p.distanceM ?? null,
+          logged_at: new Date().toISOString(),
+        }],
       });
       setFlash(slot.program_exercise_id);
       setTimeout(() => setFlash(null), 750);
-      const done = session.logged.filter((l) => l.slotId === slot.program_exercise_id).length + 1;
-      const planned = slot.sets ?? 0;
-      setResting({
-        exercise: slot.name,
-        nextSet: planned && done >= planned ? "exercise complete" : `set ${done + 1}${planned ? ` of ${planned}` : ""}`,
-      });
+      if (!isCardio(slot)) {
+        // rest timer only makes sense for strength sets
+        const done = session.logged.filter((l) => l.slotId === slot.program_exercise_id).length + 1;
+        const planned = slot.sets ?? 0;
+        setResting({
+          exercise: slot.name,
+          nextSet: planned && done >= planned ? "exercise complete" : `set ${done + 1}${planned ? ` of ${planned}` : ""}`,
+        });
+      }
     },
     [session, persist]
   );
@@ -144,13 +159,14 @@ export default function SessionLogger() {
   );
 
   const editSet = useCallback(
-    (set: LoggedSet, reps: number, weightKg: number) => {
+    (set: LoggedSet, p: LogPayload) => {
       if (!session) return;
-      persist({
-        ...session,
-        logged: session.logged.map((l) => (l.id === set.id ? { ...l, reps, weightKg } : l)),
+      persist({ ...session, logged: session.logged.map((l) => (l.id === set.id ? { ...l, ...p } : l)) });
+      void enqueue("/api/sets/update", {
+        session_id: session.id, set_id: set.id,
+        reps: p.reps ?? null, weight_kg: p.weightKg ?? null,
+        duration_s: p.durationS ?? null, distance_m: p.distanceM ?? null,
       });
-      void enqueue("/api/sets/update", { session_id: session.id, set_id: set.id, reps, weight_kg: weightKg });
     },
     [session, persist]
   );
@@ -201,7 +217,7 @@ export default function SessionLogger() {
       ) : (
         <button onClick={finish} className="btn btn-ghost w-full h-[3.25rem] rise border-volt/40 text-volt">
           <span className="font-semibold">Finish workout</span>
-          <span className="text-dim font-normal">· {session.logged.length} sets</span>
+          <span className="text-dim font-normal">· {session.logged.length} entries</span>
         </button>
       )}
 
@@ -310,6 +326,12 @@ function Panel({ children }: { children: React.ReactNode }) {
   return <div className="card p-5 rise">{children}</div>;
 }
 
+function fmtCardio(s: LoggedSet): string {
+  const min = Math.round((s.durationS ?? 0) / 60);
+  const km = s.distanceM ? (s.distanceM / 1000).toFixed(1) : null;
+  return `${min} min${km ? ` · ${km} km` : ""}`;
+}
+
 function SlotCard({
   slot,
   index,
@@ -325,29 +347,52 @@ function SlotCard({
   active: boolean;
   loggedSets: LoggedSet[];
   flash: boolean;
-  onLog: (slot: ProgramSlot, reps: number, weightKg: number) => void;
+  onLog: (slot: ProgramSlot, p: LogPayload) => void;
   onRemoveSet: (set: LoggedSet) => void;
-  onEditSet: (set: LoggedSet, reps: number, weightKg: number) => void;
+  onEditSet: (set: LoggedSet, p: LogPayload) => void;
 }) {
+  const cardio = isCardio(slot);
+  // strength inputs
   const [reps, setReps] = useState(slot.reps ?? 8);
   const [weight, setWeight] = useState(slot.load_kg ?? 20);
+  // cardio inputs
+  const [durationMin, setDurationMin] = useState(20);
+  const [distanceKm, setDistanceKm] = useState(0);
+  // inline edit
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editReps, setEditReps] = useState(8);
-  const [editWeight, setEditWeight] = useState(20);
+  const [eReps, setEReps] = useState(8);
+  const [eWeight, setEWeight] = useState(20);
+  const [eDur, setEDur] = useState(20);
+  const [eDist, setEDist] = useState(0);
   const [showCues, setShowCues] = useState(false);
+
   const planned = slot.sets ?? 0;
   const loggedCount = loggedSets.length;
-  const done = planned > 0 && loggedCount >= planned;
-  const img = slot.image_urls[0];
+  const done = !cardio && planned > 0 && loggedCount >= planned;
 
-  // prefill from the last logged set so repeat-sets are one tap
+  // prefill the next entry from the last logged one (one-tap repeats)
   const last = loggedSets[loggedSets.length - 1];
   useEffect(() => {
-    if (last) {
-      setReps(last.reps);
-      setWeight(last.weightKg);
+    if (!last) return;
+    if (cardio) {
+      if (last.durationS != null) setDurationMin(Math.round(last.durationS / 60));
+      if (last.distanceM != null) setDistanceKm(+(last.distanceM / 1000).toFixed(1));
+    } else {
+      if (last.reps != null) setReps(last.reps);
+      if (last.weightKg != null) setWeight(last.weightKg);
     }
   }, [loggedSets.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const startEdit = (s: LoggedSet) => {
+    setEditingId(s.id);
+    if (cardio) {
+      setEDur(Math.round((s.durationS ?? 0) / 60));
+      setEDist(+((s.distanceM ?? 0) / 1000).toFixed(1));
+    } else {
+      setEWeight(s.weightKg ?? 20);
+      setEReps(s.reps ?? 8);
+    }
+  };
 
   return (
     <section
@@ -355,10 +400,7 @@ function SlotCard({
       style={{ animationDelay: `${80 + index * 55}ms` }}
     >
       <div className="flex gap-3.5 p-4">
-        {img && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt={slot.name} className="w-[72px] h-[72px] object-cover rounded-xl shrink-0 bg-panel2 border border-line" />
-        )}
+        <ExerciseAnimation frames={slot.image_urls} alt={slot.name} className="w-[72px] h-[72px] rounded-xl shrink-0 border border-line" />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <h2 className="font-display font-semibold leading-tight">{slot.name}</h2>
@@ -366,9 +408,9 @@ function SlotCard({
           </div>
           <p className="text-dim text-xs mt-1 capitalize">
             {slot.equipment}
-            {planned ? ` · target ${slot.sets} × ${slot.reps}` : " · added today"}
+            {cardio ? " · cardio" : planned ? ` · target ${slot.sets} × ${slot.reps}` : " · added today"}
           </p>
-          {(planned > 0 || loggedCount > 0) && (
+          {!cardio && (planned > 0 || loggedCount > 0) && (
             <div className="flex gap-1.5 mt-2.5">
               {Array.from({ length: Math.max(planned, loggedCount) }, (_, i) => (
                 <span key={i} className={`h-1.5 w-6 rounded-full ${i < loggedCount ? "bg-volt" : "bg-line"}`} />
@@ -378,34 +420,36 @@ function SlotCard({
         </div>
       </div>
 
-      {/* logged sets — tap to edit in place, × to remove */}
+      {/* logged entries — tap to edit in place, × to remove */}
       {loggedSets.length > 0 && (
         <ul className="px-4 pb-1 space-y-1.5">
           {loggedSets.map((s, i) =>
             editingId === s.id ? (
               <li key={s.id} className="flex items-center gap-2">
                 <span className="text-dim tnum w-5 text-xs shrink-0">{i + 1}</span>
-                <div className="flex-1"><NumField value={editWeight} onChange={setEditWeight} step={2.5} min={0} max={1000} decimals={1} unit="kg" compact /></div>
-                <div className="flex-1"><NumField value={editReps} onChange={setEditReps} step={1} min={1} max={100} unit="reps" compact /></div>
-                <button
-                  onClick={() => { onEditSet(s, editReps, editWeight); setEditingId(null); }}
-                  className="btn btn-primary h-10 px-3 text-xs shrink-0"
-                >
-                  Save
-                </button>
+                {cardio ? (
+                  <>
+                    <div className="flex-1"><NumField value={eDur} onChange={setEDur} step={1} min={1} max={600} unit="min" compact /></div>
+                    <div className="flex-1"><NumField value={eDist} onChange={setEDist} step={0.1} min={0} max={300} decimals={1} unit="km" compact /></div>
+                    <button onClick={() => { onEditSet(s, { durationS: Math.round(eDur * 60), distanceM: Math.round(eDist * 1000) }); setEditingId(null); }} className="btn btn-primary h-10 px-3 text-xs shrink-0">Save</button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex-1"><NumField value={eWeight} onChange={setEWeight} step={2.5} min={0} max={1000} decimals={1} unit="kg" compact /></div>
+                    <div className="flex-1"><NumField value={eReps} onChange={setEReps} step={1} min={1} max={100} unit="reps" compact /></div>
+                    <button onClick={() => { onEditSet(s, { reps: eReps, weightKg: eWeight }); setEditingId(null); }} className="btn btn-primary h-10 px-3 text-xs shrink-0">Save</button>
+                  </>
+                )}
                 <button onClick={() => setEditingId(null)} aria-label="cancel" className="text-dim px-1.5 text-base shrink-0">×</button>
               </li>
             ) : (
               <li key={s.id} className="flex items-center gap-2 text-sm">
                 <span className="text-dim tnum w-5 text-xs">{i + 1}</span>
-                <button
-                  onClick={() => { setEditingId(s.id); setEditWeight(s.weightKg); setEditReps(s.reps); }}
-                  className="tnum text-bone/90 text-left active:text-volt"
-                >
-                  {s.weightKg} kg <span className="text-dim">×</span> {s.reps}
+                <button onClick={() => startEdit(s)} className="tnum text-bone/90 text-left active:text-volt">
+                  {cardio ? fmtCardio(s) : <>{s.weightKg} kg <span className="text-dim">×</span> {s.reps}</>}
                   <span className="text-dim text-xs ml-2">edit</span>
                 </button>
-                <button onClick={() => onRemoveSet(s)} aria-label="remove set" className="ml-auto text-dim hover:text-alert px-2 text-base leading-none">×</button>
+                <button onClick={() => onRemoveSet(s)} aria-label="remove entry" className="ml-auto text-dim hover:text-alert px-2 text-base leading-none">×</button>
               </li>
             )
           )}
@@ -425,15 +469,25 @@ function SlotCard({
         </ol>
       )}
 
-      {active && (
+      {active && (cardio ? (
+        <div className="border-t border-line p-3 space-y-2.5">
+          <div className="grid grid-cols-2 gap-2.5">
+            <NumField value={durationMin} onChange={setDurationMin} step={1} min={1} max={600} unit="min" />
+            <NumField value={distanceKm} onChange={setDistanceKm} step={0.1} min={0} max={300} decimals={1} unit="km" />
+          </div>
+          <button onClick={() => onLog(slot, { durationS: Math.round(durationMin * 60), distanceM: Math.round(distanceKm * 1000) })} className="btn btn-primary w-full h-11">
+            {loggedCount > 0 ? "Log again" : "Log"}
+          </button>
+        </div>
+      ) : (
         <div className="border-t border-line p-3 grid grid-cols-[1fr_1fr_auto] gap-2.5">
           <NumField value={weight} onChange={setWeight} step={2.5} min={0} max={1000} decimals={1} unit="kg" />
           <NumField value={reps} onChange={setReps} step={1} min={1} max={100} unit="reps" />
-          <button onClick={() => onLog(slot, reps, weight)} className="btn btn-primary px-5">
+          <button onClick={() => onLog(slot, { reps, weightKg: weight })} className="btn btn-primary px-5">
             {loggedCount > 0 ? "+ Set" : "Log"}
           </button>
         </div>
-      )}
+      ))}
     </section>
   );
 }

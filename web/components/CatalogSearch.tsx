@@ -1,12 +1,15 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { apiGet } from "@/lib/api";
+import ExerciseAnimation from "./ExerciseAnimation";
 
 export type CatalogRow = {
   exercise_id: string;
   name: string;
   equipment: string;
   primary_muscles: string[];
+  category?: string | null;
+  image_urls?: string[];
 };
 
 const EQUIPMENT = ["", "none", "dumbbell", "barbell", "kettlebell", "band", "cable", "machine"];
@@ -69,13 +72,16 @@ export default function CatalogSearch({
             <button
               key={r.exercise_id}
               onClick={() => onPick(r)}
-              className="w-full text-left px-3.5 py-2.5 flex items-center gap-2 active:bg-panel2"
+              className="w-full text-left px-3 py-2.5 flex items-center gap-3 active:bg-panel2"
             >
+              <ExerciseAnimation frames={r.image_urls ?? []} alt={r.name} className="w-11 h-11 rounded-lg shrink-0 border border-line" />
               <span className="flex-1 min-w-0">
-                <span className="text-sm text-bone/90">{r.name}</span>
-                <span className="text-dim text-xs ml-2 capitalize">{r.equipment}</span>
+                <span className="block text-sm text-bone/90 truncate">{r.name}</span>
+                <span className="block text-dim text-xs capitalize">
+                  {r.equipment}{r.category === "cardio" ? " · cardio" : ""}
+                </span>
               </span>
-              <span className={`text-lg leading-none ${picked ? "text-volt" : "text-dim"}`}>
+              <span className={`text-lg leading-none shrink-0 ${picked ? "text-volt" : "text-dim"}`}>
                 {picked ? "✓" : "+"}
               </span>
             </button>

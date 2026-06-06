@@ -6,12 +6,16 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiGet, apiPost, configured } from "@/lib/api";
 import CatalogSearch, { type CatalogRow } from "./CatalogSearch";
+import ExerciseAnimation from "./ExerciseAnimation";
 
-type Picked = { exercise_id: string; name: string; equipment: string; sets: number; reps: number };
-type TodayResp = {
-  slots: { exercise_id: string; name: string; equipment: string; sets: number | null; reps: number | null }[];
-  program: { name: string; sessions_per_week: number } | null;
+type Picked = {
+  exercise_id: string; name: string; equipment: string;
+  category?: string | null; image_urls?: string[];
+  sets?: number; reps?: number; // undefined for cardio (logged by time/distance)
 };
+type Slot = { exercise_id: string; name: string; equipment: string; category?: string | null; image_urls?: string[]; sets: number | null; reps: number | null };
+type TodayResp = { slots: Slot[]; program: { name: string; sessions_per_week: number } | null };
+const isCardio = (p: { category?: string | null }) => p.category === "cardio";
 
 export default function ProgramEditor() {
   const router = useRouter();
@@ -34,8 +38,10 @@ export default function ProgramEditor() {
             exercise_id: s.exercise_id,
             name: s.name,
             equipment: s.equipment,
-            sets: s.sets ?? 3,
-            reps: s.reps ?? 8,
+            category: s.category,
+            image_urls: s.image_urls,
+            sets: s.category === "cardio" ? undefined : (s.sets ?? 3),
+            reps: s.category === "cardio" ? undefined : (s.reps ?? 8),
           }))
         );
         if (d.program) {
@@ -51,11 +57,16 @@ export default function ProgramEditor() {
     setPicked((p) =>
       p.some((x) => x.exercise_id === r.exercise_id)
         ? p.filter((x) => x.exercise_id !== r.exercise_id) // tap again to remove
-        : [...p, { exercise_id: r.exercise_id, name: r.name, equipment: r.equipment, sets: 3, reps: 8 }]
+        : [...p, {
+            exercise_id: r.exercise_id, name: r.name, equipment: r.equipment,
+            category: r.category, image_urls: r.image_urls,
+            sets: r.category === "cardio" ? undefined : 3,
+            reps: r.category === "cardio" ? undefined : 8,
+          }]
     );
   const remove = (id: string) => setPicked((p) => p.filter((x) => x.exercise_id !== id));
   const tweak = (id: string, k: "sets" | "reps", d: number) =>
-    setPicked((p) => p.map((x) => (x.exercise_id === id ? { ...x, [k]: Math.max(1, x[k] + d) } : x)));
+    setPicked((p) => p.map((x) => (x.exercise_id === id ? { ...x, [k]: Math.max(1, (x[k] ?? 1) + d) } : x)));
   const move = (i: number, dir: -1 | 1) =>
     setPicked((p) => {
       const j = i + dir;
@@ -73,7 +84,9 @@ export default function ProgramEditor() {
       await apiPost("/api/program", {
         name,
         sessions_per_week: perWeek,
-        exercises: picked.map((p) => ({ exercise_id: p.exercise_id, sets: p.sets, reps: p.reps })),
+        exercises: picked.map((p) =>
+          isCardio(p) ? { exercise_id: p.exercise_id } : { exercise_id: p.exercise_id, sets: p.sets, reps: p.reps }
+        ),
       });
       router.push("/");
     } catch {
@@ -110,10 +123,11 @@ export default function ProgramEditor() {
           <p className="eyebrow">Your exercises · {picked.length}</p>
           {picked.map((p, i) => (
             <div key={p.exercise_id} className="card p-3.5 space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <ExerciseAnimation frames={p.image_urls ?? []} alt={p.name} className="w-11 h-11 rounded-lg shrink-0 border border-line" />
                 <span className="flex-1 min-w-0">
                   <span className="block text-sm font-medium truncate">{p.name}</span>
-                  <span className="block text-dim text-xs capitalize">{p.equipment}</span>
+                  <span className="block text-dim text-xs capitalize">{p.equipment}{isCardio(p) ? " · cardio" : ""}</span>
                 </span>
                 <div className="flex items-center gap-1 shrink-0">
                   <button onClick={() => move(i, -1)} disabled={i === 0} className="w-8 h-8 rounded-lg field text-dim active:text-volt disabled:opacity-30">↑</button>
@@ -121,10 +135,14 @@ export default function ProgramEditor() {
                   <button onClick={() => remove(p.exercise_id)} className="w-8 h-8 rounded-lg text-alert text-xl leading-none">×</button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <RepBox label="sets" value={p.sets} onDown={() => tweak(p.exercise_id, "sets", -1)} onUp={() => tweak(p.exercise_id, "sets", 1)} />
-                <RepBox label="reps" value={p.reps} onDown={() => tweak(p.exercise_id, "reps", -1)} onUp={() => tweak(p.exercise_id, "reps", 1)} />
-              </div>
+              {isCardio(p) ? (
+                <p className="text-dim text-xs">Cardio — you&apos;ll log time &amp; distance on the Today screen.</p>
+              ) : (
+                <div className="flex gap-2">
+                  <RepBox label="sets" value={p.sets ?? 3} onDown={() => tweak(p.exercise_id, "sets", -1)} onUp={() => tweak(p.exercise_id, "sets", 1)} />
+                  <RepBox label="reps" value={p.reps ?? 8} onDown={() => tweak(p.exercise_id, "reps", -1)} onUp={() => tweak(p.exercise_id, "reps", 1)} />
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -30,6 +30,7 @@ class CatalogVariantIndex:
         self._equipment = {e["id"]: e["equipment"] for e in exercises}
         self._images = {e["id"]: e.get("image_urls", []) for e in exercises}
         self._cues = {e["id"]: e.get("cues", []) for e in exercises}
+        self._category = {e["id"]: e.get("category") for e in exercises}
         self._all = exercises
         self._group_for: dict[str, dict] = {}
         for g in variant_groups:
@@ -62,6 +63,8 @@ class CatalogVariantIndex:
             out.append({
                 "exercise_id": e["id"], "name": e["name"], "equipment": e["equipment"],
                 "primary_muscles": e.get("primary_muscles", []),
+                "category": e.get("category"),
+                "image_urls": e.get("image_urls", []),
             })
             if len(out) >= limit:
                 break
@@ -75,6 +78,7 @@ class CatalogVariantIndex:
             "equipment": self.equipment_of(exercise_id),
             "image_urls": self._images.get(exercise_id, []),
             "cues": self._cues.get(exercise_id, []),
+            "category": self._category.get(exercise_id),
         }
 
     def find_equipment_variant(

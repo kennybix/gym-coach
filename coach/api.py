@@ -57,6 +57,8 @@ class SetIn(BaseModel):
     reps: Optional[int] = None
     weight_kg: Optional[float] = None
     rpe: Optional[float] = None
+    duration_s: Optional[int] = None   # cardio: seconds
+    distance_m: Optional[int] = None   # cardio: meters
     logged_at: datetime
 
 
@@ -91,6 +93,8 @@ class SetUpdateIn(BaseModel):
     set_id: str
     reps: Optional[int] = None
     weight_kg: Optional[float] = None
+    duration_s: Optional[int] = None
+    distance_m: Optional[int] = None
 
 
 @router.post("/sets/update")
@@ -98,7 +102,8 @@ async def sets_update(body: SetUpdateIn, user_id: str = Depends(get_current_user
     """Edit a logged set's reps/weight in place. Setting the same values again is a no-op,
     so it's safe to replay through the offline queue. Scoped to the caller's own session."""
     updated = await _repo.update_set_log(
-        user_id, body.session_id, body.set_id, body.reps, body.weight_kg
+        user_id, body.session_id, body.set_id, body.reps, body.weight_kg,
+        body.duration_s, body.distance_m,
     )
     return {"status": "ok", "updated": updated}
 
@@ -478,8 +483,9 @@ async def catalog_exercises(q: str | None = None, equipment: str | None = None,
 
 class ProgramExerciseIn(BaseModel):
     exercise_id: str
-    sets: int = Field(ge=1, le=10)
-    reps: int = Field(ge=1, le=100)
+    # Optional so cardio exercises (logged by time/distance) don't need sets×reps.
+    sets: Optional[int] = Field(default=None, ge=1, le=10)
+    reps: Optional[int] = Field(default=None, ge=1, le=100)
 
 
 class ProgramIn(BaseModel):

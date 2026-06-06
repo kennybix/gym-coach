@@ -42,6 +42,7 @@ export type ProgramSlot = {
   exercise_id: string;
   name: string;
   equipment: string;
+  category: string | null;
   sets: number | null;
   reps: number | null;
   load_kg: number | null;
