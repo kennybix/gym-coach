@@ -51,6 +51,8 @@ function adhocSlot(r: CatalogRow): ProgramSlot {
     sets: null,
     reps: null,
     load_kg: null,
+    suggested_kg: null,
+    suggested_reason: null,
     image_urls: r.image_urls ?? [],
     cues: [],
     position: 999,
@@ -355,9 +357,9 @@ function SlotCard({
   onEditSet: (set: LoggedSet, p: LogPayload) => void;
 }) {
   const cardio = isCardio(slot);
-  // strength inputs
+  // strength inputs — prefill weight from the deterministic next-load suggestion when present
   const [reps, setReps] = useState(slot.reps ?? 8);
-  const [weight, setWeight] = useState(slot.load_kg ?? 20);
+  const [weight, setWeight] = useState(slot.suggested_kg ?? slot.load_kg ?? 20);
   // cardio inputs
   const [durationMin, setDurationMin] = useState(20);
   const [distanceKm, setDistanceKm] = useState(0);
@@ -540,6 +542,9 @@ function SlotCard({
               {loggedCount > 0 ? "+ Set" : "Log"}
             </button>
           </div>
+          {loggedCount === 0 && slot.suggested_reason && (
+            <p className="text-dim text-xs">↗ Suggested: {slot.suggested_reason}</p>
+          )}
           {pr && <p className="text-volt text-xs font-semibold">🎉 {pr}</p>}
           <button onClick={() => setShowTag((v) => !v)} className="text-xs text-dim active:text-volt">
             {setType !== "normal" || rpe != null

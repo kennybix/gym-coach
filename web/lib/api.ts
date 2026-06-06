@@ -46,6 +46,8 @@ export type ProgramSlot = {
   sets: number | null;
   reps: number | null;
   load_kg: number | null;
+  suggested_kg: number | null;
+  suggested_reason: string | null;
   image_urls: string[];
   cues: string[];
   position: number;

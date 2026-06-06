@@ -326,18 +326,55 @@ class PostgresCoachRepo:
             """,
             user_id,
         )
+        # Last working set per exercise (latest session, heaviest non-warmup) → deterministic
+        # next-load suggestion. System-computed; the coach only explains it, never overrides.
+        ex_ids = [r["exercise_id"] for r in rows]
+        last: dict = {}
+        if ex_ids:
+            lw = await self._pool.fetch(
+                """
+                select distinct on (sl.exercise_id) sl.exercise_id, sl.weight_kg, sl.reps, sl.rpe
+                from set_logs sl join sessions s on s.session_id = sl.session_id
+                where sl.user_id = $1::uuid and sl.exercise_id = any($2::text[])
+                  and sl.weight_kg is not null and sl.reps is not null
+                  and coalesce(sl.set_type, 'normal') <> 'warmup'
+                order by sl.exercise_id, s.started_at desc, sl.weight_kg desc
+                """,
+                user_id, ex_ids,
+            )
+            last = {r["exercise_id"]: r for r in lw}
         out = []
         for r in rows:
             detail = self._catalog.detail_of(r["exercise_id"])
+            sug_kg, sug_reason = self._suggest_load(last.get(r["exercise_id"]), r["reps"])
             out.append({
                 "program_exercise_id": str(r["program_exercise_id"]),
                 "position": r["position"],
                 "sets": r["sets"],
                 "reps": r["reps"],
                 "load_kg": float(r["load_kg"]) if r["load_kg"] is not None else None,
+                "suggested_kg": sug_kg,
+                "suggested_reason": sug_reason,
                 **detail,
             })
         return out
+
+    @staticmethod
+    def _suggest_load(last, target_reps):
+        """Deterministic progressive-overload rule from the last working set. Returns
+        (suggested_kg, reason) or (None, None) when there's no history to base it on."""
+        if not last or not target_reps:
+            return None, None
+        w = float(last["weight_kg"])
+        reps = last["reps"]
+        rpe = float(last["rpe"]) if last["rpe"] is not None else None
+        if reps >= target_reps and (rpe is None or rpe <= 8):
+            return round((w + 2.5) * 2) / 2, (
+                f"+2.5 kg — hit {reps} reps last time" + (f" at RPE {rpe:g}" if rpe is not None else "")
+            )
+        if reps < target_reps:
+            return w, f"repeat {w:g} kg — missed target last time ({reps}/{target_reps})"
+        return w, f"repeat {w:g} kg — tough last time, consolidate"
 
     async def start_session(self, user_id: str, session_id: str, started_at) -> None:
         """Idempotent: client generates the session UUID so offline replays are safe."""

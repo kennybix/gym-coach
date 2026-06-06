@@ -54,7 +54,23 @@ def build_read_tools(repo: CoachRepo) -> list:
         uid = config["configurable"]["user_id"]
         return json.dumps(await repo.get_vitals_summary(uid, window_days))
 
-    return [get_weight_trend, get_adherence, get_nutrition_summary, get_current_targets, get_recent_vitals]
+    @tool
+    async def get_today_plan(config: RunnableConfig) -> str:
+        """The active program's exercises with target sets×reps and the system's deterministic
+        next-load suggestion per lift (suggested_kg + reason, from the last working set). Use to
+        explain progression — never invent a load; cite suggested_kg."""
+        import json
+        uid = config["configurable"]["user_id"]
+        slots = await repo.get_program_slots(uid)
+        compact = [
+            {"name": s["name"], "sets": s["sets"], "reps": s["reps"],
+             "suggested_kg": s.get("suggested_kg"), "reason": s.get("suggested_reason")}
+            for s in slots
+        ]
+        return json.dumps(compact)
+
+    return [get_weight_trend, get_adherence, get_nutrition_summary, get_current_targets,
+            get_recent_vitals, get_today_plan]
 
 
 def build_propose_tools(repo: CoachRepo) -> list:
