@@ -4,7 +4,8 @@ The whole app runs on this machine (the LLM is bolted here via the CLI proxy). T
 **Serve** exposes it to **your tailnet only** over HTTPS — private, no public internet, no
 droplet, no DNS. Your phone reaches it whenever Tailscale is on.
 
-**App URL:** `https://quantoptimus.taile8b1de.ts.net`
+**App URL:** `https://gym-coach.taile8b1de.ts.net`  (served from a dedicated
+Tailscale node — `gym-coach-tailscaled` + `gym-coach-serve` units, mirroring mynah)
 
 Already done (app side, verified):
 - Single origin — the frontend proxies `/api`,`/coach`,`/knowledge` to the backend.
@@ -21,11 +22,11 @@ Open <https://login.tailscale.com/admin/dns> → **Enable HTTPS**. (MagicDNS mus
 cd ~/Documents/Projects/gym-coach
 sudo bash deploy/tailscale-serve.sh
 ```
-You should see a mapping `https://quantoptimus.taile8b1de.ts.net → http://127.0.0.1:3010`.
+You should see a mapping `https://gym-coach.taile8b1de.ts.net → http://127.0.0.1:3010`.
 
 ### 3. On the S26+
 1. Install **Tailscale** from the Play Store, sign in as **oyetundedamilare@gmail.com**, toggle it **on**.
-2. Open **`https://quantoptimus.taile8b1de.ts.net`** in Chrome.
+2. Open **`https://gym-coach.taile8b1de.ts.net`** in Chrome.
 3. Go to **Setup** → paste your **bearer token** (below) into "Bearer token" → **Save**.
    (Leave "API base URL" blank — it uses the site automatically.)
 4. Chrome menu → **Add to Home screen** to install the PWA. Open it from the icon —
