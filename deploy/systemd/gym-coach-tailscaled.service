@@ -1,0 +1,18 @@
+[Unit]
+Description=Gym Coach — dedicated Tailscale node (userspace) for https://gym-coach.<tailnet>.ts.net
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStartPre=/bin/mkdir -p %h/.local/share/tailscale-gym-coach
+ExecStart=/usr/sbin/tailscaled \
+    --tun=userspace-networking \
+    --statedir=%h/.local/share/tailscale-gym-coach \
+    --socket=%h/.local/share/tailscale-gym-coach/tailscaled.sock \
+    --port=0
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
