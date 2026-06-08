@@ -116,7 +116,7 @@ This is a health-adjacent product. These are deliberate and must be preserved:
 ## Current status
 
 **Live and running** on this machine (`quantoptimus`) as systemd user services, served to
-the user's Android phone over Tailscale at `https://quantoptimus.taile8b1de.ts.net`
+the user's Android phone over Tailscale at `https://gym-coach.taile8b1de.ts.net`
 (tailnet-only HTTPS). Coach runs on **GPT-5.5 via the local CLI proxy**; embeddings via a
 **LiteLLM→Ollama** gateway; RAG corpus populated (~257 chunks). Restart-resilient
 (`Restart=always`, linger on). Full test suite green.

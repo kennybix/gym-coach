@@ -27,7 +27,7 @@ off/asleep, the app is down (acceptable — it's a personal tool, and the machin
 
 ```
  Samsung S26+ (Tailscale ON)
-        │  https://quantoptimus.taile8b1de.ts.net   (tailnet-only, real TLS)
+        │  https://gym-coach.taile8b1de.ts.net   (tailnet-only, real TLS)
         ▼
  tailscaled  ──►  `tailscale serve`  (root → 127.0.0.1:3010)
         ▼
@@ -100,7 +100,7 @@ auto-created by `AsyncPostgresSaver`. `dev_up.sh` bootstraps a fresh DB.
 
 ## 6. Phone access (Tailscale Serve)
 
-- **URL:** `https://quantoptimus.taile8b1de.ts.net` — **tailnet-only** (Serve, *not* Funnel),
+- **URL:** `https://gym-coach.taile8b1de.ts.net` — **tailnet-only** (Serve, *not* Funnel),
   so nothing is public; the user's signed-in devices are the gate, the JWT is the data auth.
 - Set up once: enable HTTPS in the Tailscale admin console; `sudo tailscale set --operator=$USER`;
   then `tailscale serve --bg http://127.0.0.1:3010` (script: [`deploy/tailscale-serve.sh`](../deploy/tailscale-serve.sh)).
