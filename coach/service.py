@@ -23,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import api as rest_api
 from .auth import get_current_user_id
+from . import energy
 from .graph import build_coach_graph, summarize_evidence
 from .parse import parse_workout
 from .insight import generate_insight
@@ -117,7 +118,12 @@ async def parse_workout_ep(body: ParseWorkoutIn, user_id: str = Depends(get_curr
         raise HTTPException(503, "coach unavailable: LLM provider not configured")
     if not (body.text or "").strip():
         return {"entries": []}
-    return await parse_workout(body.text, model, _state["repo"])
+    result = await parse_workout(body.text, model, _state["repo"])
+    weight = await _state["repo"].get_latest_weight_kg(user_id)
+    for e in result.get("entries", []):
+        ex = e.get("exercise") or {}
+        e["est_kcal"] = energy.estimate_kcal(ex.get("name", ""), e.get("duration_s"), e.get("distance_m"), weight)
+    return result
 
 
 class ConfirmIn(BaseModel):

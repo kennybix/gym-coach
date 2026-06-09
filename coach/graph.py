@@ -107,6 +107,10 @@ def _evidence_for(name: str, d: dict) -> Optional[dict]:
             if latest.get("heart_rate"):
                 parts.append(f"{latest['heart_rate']} bpm")
         return {"label": "Vitals", "detail": " · ".join(parts) or f"{g('n_readings')} readings"}
+    if name == "get_activity_energy":
+        if not g("total_est_kcal"):
+            return None
+        return {"label": "Activity", "detail": f"~{g('total_est_kcal')} kcal burned · {g('window_days')}d (est.)"}
     return None
 
 

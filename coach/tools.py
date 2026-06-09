@@ -69,8 +69,17 @@ def build_read_tools(repo: CoachRepo) -> list:
         ]
         return json.dumps(compact)
 
+    @tool
+    async def get_activity_energy(window_days: int, config: RunnableConfig) -> str:
+        """Estimated calories burned from logged cardio + sports/activities over the window
+        (MET x bodyweight x time). These are ESTIMATES from duration, not measured — present
+        them as approximate. Use to reference the expenditure side of energy balance."""
+        import json
+        uid = config["configurable"]["user_id"]
+        return json.dumps(await repo.get_activity_energy(uid, window_days))
+
     return [get_weight_trend, get_adherence, get_nutrition_summary, get_current_targets,
-            get_recent_vitals, get_today_plan]
+            get_recent_vitals, get_today_plan, get_activity_energy]
 
 
 def build_propose_tools(repo: CoachRepo) -> list:

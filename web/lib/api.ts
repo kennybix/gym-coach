@@ -83,6 +83,7 @@ export type ParsedEntry = {
   confidence: "high" | "medium" | "low";
   note: string;
   rpe: number | null;
+  est_kcal?: number | null;
   sets?: number;
   reps?: number;
   weight_kg?: number | null;

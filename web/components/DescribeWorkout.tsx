@@ -122,7 +122,7 @@ export default function DescribeWorkout({ onClose, onLogged }: { onClose: () => 
                         </button>
                       )}
                       <span className="block text-dim text-[11px] truncate mt-0.5">
-                        {e.custom ? "activity" : e.kind}{e.confidence === "low" ? " · low confidence" : ""}{e.note ? ` · ${e.note}` : ""}
+                        {e.custom ? "activity" : e.kind}{e.confidence === "low" ? " · low confidence" : ""}{e.est_kcal ? ` · ~${e.est_kcal} kcal` : ""}{e.note ? ` · ${e.note}` : ""}
                       </span>
                     </div>
                     <button onClick={() => setPickFor(pickFor === i ? null : i)} className="text-dim text-[11px] shrink-0 active:text-volt">catalog</button>
@@ -170,6 +170,12 @@ export default function DescribeWorkout({ onClose, onLogged }: { onClose: () => 
               ))}
             </div>
 
+            {entries.reduce((t, e) => t + (e.est_kcal ?? 0), 0) > 0 && (
+              <p className="text-dim text-xs mt-3 text-center">
+                Estimated energy: ~{entries.reduce((t, e) => t + (e.est_kcal ?? 0), 0)} kcal
+                <span className="opacity-70"> · rough, from duration</span>
+              </p>
+            )}
             <div className="flex gap-2.5 mt-4">
               <button onClick={() => { setEntries(null); setErr(null); }} className="btn btn-ghost h-12 px-4">Back</button>
               <button onClick={logAll} disabled={readyCount === 0} className="btn btn-primary flex-1 h-12">

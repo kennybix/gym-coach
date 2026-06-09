@@ -16,6 +16,7 @@ from typing import Optional
 
 import asyncpg
 
+from . import energy
 from .catalog import CatalogVariantIndex
 from .models import (
     AdherenceSummary,
@@ -450,6 +451,39 @@ class PostgresCoachRepo:
             session_id, user_id, completed_at,
         )
 
+    async def get_latest_weight_kg(self, user_id: str) -> Optional[float]:
+        """Most recent logged bodyweight — for MET-based activity-energy estimates."""
+        v = await self._pool.fetchval(
+            """select weight_kg from body_metrics
+               where user_id = $1::uuid and weight_kg is not null
+               order by recorded_at desc limit 1""",
+            user_id,
+        )
+        return float(v) if v is not None else None
+
+    async def get_activity_energy(self, user_id: str, window_days: int = 7) -> dict:
+        """Estimated calories burned from duration-based logs (cardio + sports) over the window,
+        MET x bodyweight x time. Estimates, not measurements."""
+        weight = await self.get_latest_weight_kg(user_id)
+        rows = await self._pool.fetch(
+            """select sl.exercise_id, sum(sl.duration_s)::bigint as dur,
+                      sum(sl.distance_m)::bigint as dist, count(*) as n
+               from set_logs sl join sessions s on s.session_id = sl.session_id
+               where sl.user_id = $1::uuid and sl.duration_s is not null
+                 and coalesce(s.completed_at, s.started_at) >= now() - make_interval(days => $2::int)
+               group by sl.exercise_id order by dur desc""",
+            user_id, window_days,
+        )
+        activities, total = [], 0
+        for r in rows:
+            name = self._catalog.name_of(r["exercise_id"])
+            kcal = energy.estimate_kcal(name, r["dur"], r["dist"], weight)
+            total += kcal or 0
+            activities.append({"name": name, "minutes": round((r["dur"] or 0) / 60),
+                               "sessions": r["n"], "est_kcal": kcal})
+        return {"window_days": window_days, "weight_kg_used": round(weight, 1) if weight else None,
+                "total_est_kcal": total, "activities": activities}
+
     async def get_session_history(self, user_id: str, limit: int = 30) -> list[dict]:
         """Past sessions (most recent first) with their logged sets + exercise names,
         for the history screen. Empty sessions are omitted."""
@@ -468,18 +502,21 @@ class PostgresCoachRepo:
                order by logged_at""",
             user_id, ids,
         )
+        bw = await self.get_latest_weight_kg(user_id)  # for MET-based activity energy estimates
         by_session: dict = {}
         for r in rows:
+            name = self._catalog.name_of(r["exercise_id"])
             by_session.setdefault(str(r["session_id"]), []).append({
                 "id": str(r["id"]),
                 "exercise_id": r["exercise_id"],
-                "name": self._catalog.name_of(r["exercise_id"]),
+                "name": name,
                 "reps": r["reps"],
                 "weight_kg": float(r["weight_kg"]) if r["weight_kg"] is not None else None,
                 "rpe": float(r["rpe"]) if r["rpe"] is not None else None,
                 "set_type": r["set_type"],
                 "duration_s": r["duration_s"],
                 "distance_m": r["distance_m"],
+                "est_kcal": energy.estimate_kcal(name, r["duration_s"], r["distance_m"], bw),
                 "logged_at": r["logged_at"].isoformat(),
             })
         out = []
