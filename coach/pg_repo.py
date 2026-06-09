@@ -820,6 +820,51 @@ class PostgresCoachRepo:
             del it["_ts"]
         return items[:limit]
 
+    # --- saved meals (named food bundles) -----------------------------------
+    async def save_meal(self, user_id: str, name: str, items: list[dict]) -> str:
+        mid = await self._pool.fetchval(
+            "insert into meals (user_id, name, items) values ($1::uuid, $2, $3::jsonb) returning id",
+            user_id, name, json.dumps(items),
+        )
+        return str(mid)
+
+    async def list_meals(self, user_id: str) -> list[dict]:
+        rows = await self._pool.fetch(
+            "select id, name, items from meals where user_id = $1::uuid order by created_at desc",
+            user_id,
+        )
+        out = []
+        for r in rows:
+            items = r["items"] if isinstance(r["items"], list) else json.loads(r["items"])
+            out.append({
+                "id": str(r["id"]), "name": r["name"], "item_count": len(items),
+                "kcal": sum(int(i.get("kcal") or 0) for i in items),
+            })
+        return out
+
+    async def delete_meal(self, user_id: str, meal_id: str) -> int:
+        status = await self._pool.execute(
+            "delete from meals where id = $1::uuid and user_id = $2::uuid", meal_id, user_id
+        )
+        return int(status.rsplit(" ", 1)[-1])
+
+    async def log_meal(self, user_id: str, meal_id: str, logged_on) -> dict:
+        """Expand a saved meal's items into ordinary food_entries for the day."""
+        import uuid as _uuid
+        row = await self._pool.fetchrow(
+            "select items from meals where id = $1::uuid and user_id = $2::uuid", meal_id, user_id
+        )
+        if not row:
+            raise PermissionError(f"meal {meal_id!r} not found for user {user_id!r}")
+        items = row["items"] if isinstance(row["items"], list) else json.loads(row["items"])
+        for it in items:
+            await self.insert_food_entry(
+                user_id, str(_uuid.uuid4()), logged_on, (it.get("name") or "Food"), it.get("brand"),
+                it.get("grams"), int(it.get("kcal") or 0), it.get("protein_g"),
+                it.get("carbs_g"), it.get("fat_g"), it.get("fiber_g"),
+            )
+        return await self.recompute_nutrition_day(user_id, logged_on)
+
     async def recompute_nutrition_day(self, user_id: str, logged_on) -> dict:
         """Set the day's nutrition_logs total to the sum of its food entries, so the summary,
         coach, and trends stay consistent. Food entries own the day's total when present."""

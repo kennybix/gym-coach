@@ -11,6 +11,7 @@ type Food = { code: string | null; name: string; brand: string | null; kcal_100g
 type Macros = { protein_g: number | null; carbs_g?: number | null; fat_g?: number | null; fiber_g?: number | null };
 type Entry = { id: string; name: string; brand: string | null; grams: number | null; kcal: number } & Macros;
 type Recent = { name: string; brand: string | null; grams: number | null; kcal: number } & Macros;
+type Meal = { id: string; name: string; item_count: number; kcal: number };
 
 export default function FoodLog({ date, onChange }: { date: string; onChange?: () => void }) {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -26,6 +27,8 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
   const [scanning, setScanning] = useState(false);
   const [looking, setLooking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [mealName, setMealName] = useState<string | null>(null);
 
   const loadEntries = useCallback(() => {
     apiGet<{ foods: Entry[] }>(`/api/foods?date=${date}`).then((d) => setEntries(d.foods)).catch(() => setEntries([]));
@@ -33,9 +36,34 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
   const loadRecent = useCallback(() => {
     apiGet<{ foods: Recent[] }>("/api/foods/recent").then((d) => setRecent(d.foods)).catch(() => setRecent([]));
   }, []);
-  useEffect(() => { loadEntries(); loadRecent(); }, [loadEntries, loadRecent]);
+  const loadMeals = useCallback(() => {
+    apiGet<{ meals: Meal[] }>("/api/meals").then((d) => setMeals(d.meals)).catch(() => setMeals([]));
+  }, []);
+  useEffect(() => { loadEntries(); loadRecent(); loadMeals(); }, [loadEntries, loadRecent, loadMeals]);
 
-  const refresh = useCallback(() => { loadEntries(); loadRecent(); onChange?.(); }, [loadEntries, loadRecent, onChange]);
+  const refresh = useCallback(() => { loadEntries(); loadRecent(); loadMeals(); onChange?.(); }, [loadEntries, loadRecent, loadMeals, onChange]);
+
+  const logMeal = useCallback(async (m: Meal) => {
+    await apiPost("/api/meals/log", { meal_id: m.id, logged_on: date });
+    refresh();
+  }, [date, refresh]);
+  const deleteMeal = useCallback(async (m: Meal) => {
+    await apiPost("/api/meals/delete", { meal_id: m.id });
+    loadMeals();
+  }, [loadMeals]);
+  const saveMeal = useCallback(async () => {
+    const name = (mealName || "").trim();
+    if (!name || entries.length === 0) return;
+    await apiPost("/api/meals", {
+      name,
+      items: entries.map((e) => ({
+        name: e.name, brand: e.brand, grams: e.grams, kcal: e.kcal,
+        protein_g: e.protein_g, carbs_g: e.carbs_g, fat_g: e.fat_g, fiber_g: e.fiber_g,
+      })),
+    });
+    setMealName(null);
+    loadMeals();
+  }, [mealName, entries, loadMeals]);
 
   const search = useCallback(() => {
     const q = query.trim();
@@ -144,6 +172,24 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
       {looking && <p className="text-dim text-xs mt-2">Looking up barcode…</p>}
       {notice && <p className="text-dim text-xs mt-2">{notice}</p>}
 
+      {/* saved meals — one-tap log the whole bundle */}
+      {meals.length > 0 && !results && !picked && (
+        <div className="mt-3">
+          <p className="text-dim text-xs mb-2">Meals</p>
+          <div className="flex flex-wrap gap-1.5">
+            {meals.map((m) => (
+              <span key={m.id} className="chip inline-flex items-center pl-3 pr-1 py-1.5 text-xs text-bone/90">
+                <button onClick={() => logMeal(m)} className="active:text-volt">
+                  {m.name.length > 20 ? m.name.slice(0, 20) + "…" : m.name}
+                  <span className="text-dim ml-1.5 tnum">{m.kcal}</span>
+                </button>
+                <button onClick={() => deleteMeal(m)} aria-label="delete meal" className="text-dim hover:text-alert px-1.5 text-sm leading-none">×</button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* recent — one-tap re-log */}
       {recent.length > 0 && !results && !picked && (
         <div className="mt-3">
@@ -221,6 +267,25 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
             </li>
           ))}
         </ul>
+      )}
+
+      {/* save the day's foods as a reusable meal */}
+      {entries.length > 0 && !picked && !results && (
+        mealName === null ? (
+          <button onClick={() => setMealName("")} className="text-xs text-dim active:text-volt mt-3">+ Save these as a meal</button>
+        ) : (
+          <div className="flex gap-2 mt-3">
+            <input
+              value={mealName}
+              onChange={(e) => setMealName(e.target.value)}
+              placeholder="Meal name (e.g. My breakfast)"
+              className="field flex-1 min-w-0 h-10 px-3 text-sm outline-none"
+              autoFocus
+            />
+            <button onClick={saveMeal} disabled={!mealName.trim()} className="btn btn-primary h-10 px-4 text-sm">Save</button>
+            <button onClick={() => setMealName(null)} className="btn btn-ghost h-10 px-3 text-sm">×</button>
+          </div>
+        )
       )}
       {entries.length === 0 && !results && recent.length === 0 && (
         <p className="text-dim text-xs mt-3">Search or scan a food to add it — the day total updates automatically and feeds your trends + coach.</p>

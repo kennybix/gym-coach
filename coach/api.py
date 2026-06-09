@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from . import safety as safety_mod
@@ -421,6 +421,59 @@ async def foods_delete(body: FoodDeleteIn, user_id: str = Depends(get_current_us
     await _repo.delete_food_entry(user_id, body.id)
     totals = await _repo.recompute_nutrition_day(user_id, day)
     return {"status": "ok", "day_totals": totals}
+
+
+# ----------------------------- saved meals -----------------------------------
+class MealItemIn(BaseModel):
+    name: str
+    brand: Optional[str] = None
+    grams: Optional[float] = None
+    kcal: int
+    protein_g: Optional[float] = None
+    carbs_g: Optional[float] = None
+    fat_g: Optional[float] = None
+    fiber_g: Optional[float] = None
+
+
+class MealSaveIn(BaseModel):
+    name: str
+    items: list[MealItemIn] = Field(default_factory=list)
+
+
+@router.post("/meals")
+async def meal_save(body: MealSaveIn, user_id: str = Depends(get_current_user_id)):
+    if not body.items:
+        raise HTTPException(400, "a meal needs at least one item")
+    mid = await _repo.save_meal(user_id, body.name[:80], [i.model_dump() for i in body.items])
+    return {"status": "ok", "id": mid}
+
+
+@router.get("/meals")
+async def meals_list(user_id: str = Depends(get_current_user_id)):
+    return {"meals": await _repo.list_meals(user_id)}
+
+
+class MealLogIn(BaseModel):
+    meal_id: str
+    logged_on: Optional[str] = None
+
+
+@router.post("/meals/log")
+async def meal_log(body: MealLogIn, user_id: str = Depends(get_current_user_id)):
+    from datetime import date
+    day = date.fromisoformat(body.logged_on) if body.logged_on else _now().date()
+    totals = await _repo.log_meal(user_id, body.meal_id, day)
+    return {"status": "ok", "logged_on": day.isoformat(), "day_totals": totals}
+
+
+class MealDeleteIn(BaseModel):
+    meal_id: str
+
+
+@router.post("/meals/delete")
+async def meal_delete(body: MealDeleteIn, user_id: str = Depends(get_current_user_id)):
+    await _repo.delete_meal(user_id, body.meal_id)
+    return {"status": "ok"}
 
 
 class NutritionIn(BaseModel):
