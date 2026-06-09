@@ -27,6 +27,7 @@ class ReviewState(TypedDict):
     adherence: Optional[dict]
     nutrition: Optional[dict]
     vitals: Optional[dict]
+    energy: Optional[dict]
     assessment: Optional[dict]
     committed_changes: dict
 
@@ -37,7 +38,10 @@ REVIEW_PROMPT = (
     "rate), classify the status and write a short, honest, encouraging summary (2-4 "
     "sentences). If vitals were logged, you may note a meaningful trend (e.g. a falling "
     "resting heart rate is a real win); if a reading is in a clearly concerning range, "
-    "gently suggest a professional check rather than interpreting it. Propose a calorie-"
+    "gently suggest a professional check rather than interpreting it. If energy.maintenance_"
+    "kcal_per_day is present, you MAY note the rough intake-vs-maintenance picture "
+    "descriptively (estimates; the weight trend is the real signal) — never as a target or a "
+    "verdict, and skip it entirely when it is null. Propose a calorie-"
     "target change ONLY if the data clearly supports it — e.g. a genuine stall alongside "
     "good adherence. Be conservative: small adjustments beat big ones, and no change is a "
     "valid outcome."
@@ -58,6 +62,7 @@ def build_review_graph(repo: CoachRepo, model_id: str = "google_genai:gemini-3.5
             "adherence": (await repo.get_adherence(uid, w)).model_dump(),
             "nutrition": (await repo.get_nutrition_summary(uid, w)).model_dump(),
             "vitals": await repo.get_vitals_summary(uid, w),
+            "energy": await repo.get_energy_balance(uid, w),
         }
 
     async def assess(state: ReviewState) -> dict:
@@ -70,6 +75,7 @@ def build_review_graph(repo: CoachRepo, model_id: str = "google_genai:gemini-3.5
             "adherence": state["adherence"],
             "nutrition": state["nutrition"],
             "vitals": state.get("vitals"),
+            "energy": state.get("energy"),
         }
         result: ReviewAssessment = await assessor.ainvoke(
             REVIEW_PROMPT + "\n\nDATA:\n" + str(payload)
