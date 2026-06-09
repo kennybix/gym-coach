@@ -66,6 +66,41 @@ export type ExerciseStats = {
 export const exerciseStats = (id: string) =>
   apiGet<ExerciseStats>(`/api/exercise/${encodeURIComponent(id)}/stats`);
 
+export type CatalogMatch = {
+  exercise_id: string;
+  name: string;
+  equipment: string;
+  category: string | null;
+  image_urls: string[];
+};
+export type ParsedEntry = {
+  raw: string;
+  kind: "strength" | "cardio";
+  exercise_query: string;
+  exercise: CatalogMatch | null;
+  candidates: CatalogMatch[];
+  confidence: "high" | "medium" | "low";
+  note: string;
+  rpe: number | null;
+  sets?: number;
+  reps?: number;
+  weight_kg?: number | null;
+  duration_s?: number | null;
+  distance_m?: number | null;
+};
+export async function parseWorkout(
+  text: string
+): Promise<{ entries: ParsedEntry[] } | { unavailable: true }> {
+  const res = await fetch(`${apiBase()}/coach/parse-workout`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (res.status === 503) return { unavailable: true };
+  if (!res.ok) throw new Error(`parse-workout -> ${res.status}`);
+  return res.json();
+}
+
 /* ---- coach endpoints (separate from /api; may be 503 if no LLM configured) ---- */
 export type Evidence = { label: string; detail: string };
 export type CoachReply =

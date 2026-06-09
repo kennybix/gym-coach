@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import api as rest_api
 from .auth import get_current_user_id
 from .graph import build_coach_graph, summarize_evidence
+from .parse import parse_workout
 from .insight import generate_insight
 from .review import build_review_graph
 from .pg_repo import PostgresCoachRepo
@@ -101,6 +102,22 @@ async def chat(body: ChatIn, user_id: str = Depends(get_current_user_id)):
         "reply": result["messages"][-1].content,
         "evidence": summarize_evidence(result["messages"]),
     }
+
+
+class ParseWorkoutIn(BaseModel):
+    text: str
+
+
+@app.post("/coach/parse-workout")
+async def parse_workout_ep(body: ParseWorkoutIn, user_id: str = Depends(get_current_user_id)):
+    """Parse a free-text workout description into structured, catalog-matched entries the user
+    can confirm/edit, then log via /api/sets/sync. No DB write here. 503 if no LLM configured."""
+    model = _state.get("insight_model")
+    if model is None:
+        raise HTTPException(503, "coach unavailable: LLM provider not configured")
+    if not (body.text or "").strip():
+        return {"entries": []}
+    return await parse_workout(body.text, model, _state["repo"])
 
 
 class ConfirmIn(BaseModel):

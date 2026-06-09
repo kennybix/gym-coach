@@ -8,6 +8,7 @@ import Link from "next/link";
 import { apiGet, configured, exerciseStats, type ProgramSlot } from "@/lib/api";
 import { enqueue, installQueueAutoFlush, subscribeQueue } from "@/lib/queue";
 import CatalogSearch, { type CatalogRow } from "./CatalogSearch";
+import DescribeWorkout from "./DescribeWorkout";
 import ExerciseAnimation from "./ExerciseAnimation";
 import ExerciseDetail from "./ExerciseDetail";
 import InsightCard from "./InsightCard";
@@ -68,6 +69,8 @@ export default function SessionLogger() {
   const [resting, setResting] = useState<{ exercise: string; nextSet: string } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [showDescribe, setShowDescribe] = useState(false);
+  const [describedTick, setDescribedTick] = useState(false);
 
   useEffect(() => {
     setSession(loadSession());
@@ -226,6 +229,13 @@ export default function SessionLogger() {
         </button>
       )}
 
+      <button onClick={() => setShowDescribe(true)} className="btn btn-ghost w-full h-12 rise border-dashed">
+        ✍️ Describe a workout you did
+      </button>
+      {describedTick && (
+        <p className="text-volt text-xs text-center -mt-2">Logged — find it in History.</p>
+      )}
+
       {allSlots.length === 0 ? (
         <Panel>
           <p className="text-dim text-sm leading-relaxed">
@@ -274,6 +284,13 @@ export default function SessionLogger() {
             />
           </div>
         </div>
+      )}
+
+      {showDescribe && (
+        <DescribeWorkout
+          onClose={() => setShowDescribe(false)}
+          onLogged={() => { setDescribedTick(true); setTimeout(() => setDescribedTick(false), 4000); }}
+        />
       )}
 
       {resting && (

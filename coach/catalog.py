@@ -70,6 +70,34 @@ class CatalogVariantIndex:
                 break
         return out
 
+    def match(self, query: str | None, equipment: str | None = None, limit: int = 5) -> list[dict]:
+        """Rank catalog exercises against a free-text query — for natural-language workout
+        logging. Scores by token overlap on name + base_movement, boosting an exact substring
+        and an equipment match, and slightly preferring concise/canonical names."""
+        import re
+        ql = (query or "").lower().strip()
+        toks = set(re.findall(r"[a-z0-9]+", ql))
+        scored = []
+        for e in self._all:
+            name = e["name"].lower()
+            base = (e.get("base_movement") or "").lower()
+            hay = set(re.findall(r"[a-z0-9]+", f"{name} {base}"))
+            overlap = len(toks & hay)
+            sub = bool(ql) and (ql in name or ql in base)
+            if not overlap and not sub:
+                continue
+            score = overlap + (3 if sub else 0)
+            if equipment and e["equipment"] == equipment:
+                score += 2
+            score -= 0.1 * len(name.split())
+            scored.append((score, e))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [
+            {"exercise_id": e["id"], "name": e["name"], "equipment": e["equipment"],
+             "category": e.get("category"), "image_urls": e.get("image_urls", [])}
+            for _, e in scored[:limit]
+        ]
+
     def detail_of(self, exercise_id: str) -> dict:
         """Media + coaching cues for the UI."""
         return {

@@ -856,3 +856,6 @@ class PostgresCoachRepo:
 
     def search_catalog(self, q=None, equipment=None, limit: int = 30) -> list[dict]:
         return self._catalog.search(q=q, equipment=equipment, limit=limit)
+
+    def match_catalog(self, query, equipment=None, limit: int = 5) -> list[dict]:
+        return self._catalog.match(query, equipment=equipment, limit=limit)
