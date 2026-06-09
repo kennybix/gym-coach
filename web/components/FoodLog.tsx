@@ -7,9 +7,10 @@ import { apiGet, apiPost } from "@/lib/api";
 import NumField from "./NumField";
 import BarcodeScanner from "./BarcodeScanner";
 
-type Food = { code: string | null; name: string; brand: string | null; kcal_100g: number; protein_100g: number; serving_g: number | null };
-type Entry = { id: string; name: string; brand: string | null; grams: number | null; kcal: number; protein_g: number | null };
-type Recent = { name: string; brand: string | null; grams: number | null; kcal: number; protein_g: number | null };
+type Food = { code: string | null; name: string; brand: string | null; kcal_100g: number; protein_100g: number; carbs_100g: number; fat_100g: number; fiber_100g: number; serving_g: number | null };
+type Macros = { protein_g: number | null; carbs_g?: number | null; fat_g?: number | null; fiber_g?: number | null };
+type Entry = { id: string; name: string; brand: string | null; grams: number | null; kcal: number } & Macros;
+type Recent = { name: string; brand: string | null; grams: number | null; kcal: number } & Macros;
 
 export default function FoodLog({ date, onChange }: { date: string; onChange?: () => void }) {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -60,11 +61,12 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
   const add = useCallback(async () => {
     if (!picked) return;
     const g = unit === "serving" ? Math.round(servings * gPerServing) : grams;
-    const kcal = Math.round((picked.kcal_100g * g) / 100);
-    const protein = Math.round((picked.protein_100g * g) / 100 * 10) / 10;
+    const per = (v: number) => Math.round((v * g) / 100 * 10) / 10;
     await apiPost("/api/foods/log", {
-      id: crypto.randomUUID(), logged_on: date, name: picked.name,
-      brand: picked.brand, grams: g, kcal, protein_g: protein,
+      id: crypto.randomUUID(), logged_on: date, name: picked.name, brand: picked.brand, grams: g,
+      kcal: Math.round((picked.kcal_100g * g) / 100),
+      protein_g: per(picked.protein_100g), carbs_g: per(picked.carbs_100g),
+      fat_g: per(picked.fat_100g), fiber_g: per(picked.fiber_100g),
     });
     setPicked(null); setResults(null); setQuery("");
     refresh();
@@ -72,8 +74,8 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
 
   const reLog = useCallback(async (r: Recent) => {
     await apiPost("/api/foods/log", {
-      id: crypto.randomUUID(), logged_on: date, name: r.name,
-      brand: r.brand, grams: r.grams, kcal: r.kcal, protein_g: r.protein_g,
+      id: crypto.randomUUID(), logged_on: date, name: r.name, brand: r.brand, grams: r.grams,
+      kcal: r.kcal, protein_g: r.protein_g, carbs_g: r.carbs_g, fat_g: r.fat_g, fiber_g: r.fiber_g,
     });
     refresh();
   }, [date, refresh]);
@@ -100,7 +102,8 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
   }, []);
 
   const totalK = entries.reduce((s, e) => s + e.kcal, 0);
-  const totalP = Math.round(entries.reduce((s, e) => s + (e.protein_g || 0), 0));
+  const sum = (k: keyof Macros) => Math.round(entries.reduce((s, e) => s + ((e[k] as number) || 0), 0));
+  const totalP = sum("protein_g"), totalC = sum("carbs_g"), totalF = sum("fat_g"), totalFib = sum("fiber_g");
 
   return (
     <div className="card p-5 rise">
@@ -108,10 +111,19 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
         <p className="eyebrow">Food log</p>
         {entries.length > 0 && (
           <span className="tnum text-sm text-dim">
-            <span className="text-volt font-semibold">{totalK}</span> kcal · {totalP} g
+            <span className="text-volt font-semibold">{totalK}</span> kcal
           </span>
         )}
       </div>
+      {entries.length > 0 && (totalP + totalC + totalF) > 0 && (
+        <div className="flex gap-3 text-[11px] text-dim mb-3 -mt-2 tnum">
+          <span>P <span className="text-bone/80">{totalP}</span></span>
+          <span>C <span className="text-bone/80">{totalC}</span></span>
+          <span>F <span className="text-bone/80">{totalF}</span></span>
+          {totalFib > 0 && <span>Fiber <span className="text-bone/80">{totalFib}</span></span>}
+          <span className="opacity-60">g</span>
+        </div>
+      )}
 
       {/* search + scan */}
       <div className="flex gap-2">
@@ -181,7 +193,10 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
             </div>
           )}
           <p className="text-dim text-xs tnum">
-            {unit === "serving" ? `${effectiveGrams} g · ` : ""}= {Math.round((picked.kcal_100g * effectiveGrams) / 100)} kcal · {Math.round((picked.protein_100g * effectiveGrams) / 100 * 10) / 10} g protein
+            {unit === "serving" ? `${effectiveGrams} g · ` : ""}= {Math.round((picked.kcal_100g * effectiveGrams) / 100)} kcal
+            {" · "}P {Math.round((picked.protein_100g * effectiveGrams) / 100 * 10) / 10}
+            {" · "}C {Math.round((picked.carbs_100g * effectiveGrams) / 100 * 10) / 10}
+            {" · "}F {Math.round((picked.fat_100g * effectiveGrams) / 100 * 10) / 10} g
           </p>
           <div className="flex gap-2">
             <button onClick={add} className="btn btn-primary flex-1 h-10 text-sm">Add to day</button>

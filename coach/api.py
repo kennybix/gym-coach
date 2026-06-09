@@ -311,6 +311,9 @@ async def foods_search(q: str, user_id: str = Depends(get_current_user_id)):
             "brand": brand[:60] if brand else None,
             "kcal_100g": round(float(kcal)),
             "protein_100g": round(float(n.get("proteins_100g") or 0), 1),
+            "carbs_100g": round(float(n.get("carbohydrates_100g") or 0), 1),
+            "fat_100g": round(float(n.get("fat_100g") or 0), 1),
+            "fiber_100g": round(float(n.get("fiber_100g") or 0), 1),
             "serving_g": round(float(sq)) if sq else None,
         })
         if len(foods) >= 20:
@@ -366,6 +369,9 @@ async def foods_barcode(code: str, user_id: str = Depends(get_current_user_id)):
                 "brand": brand[:60] if brand else None,
                 "kcal_100g": round(float(kcal)),
                 "protein_100g": round(float(n.get("proteins_100g") or 0), 1),
+                "carbs_100g": round(float(n.get("carbohydrates_100g") or 0), 1),
+                "fat_100g": round(float(n.get("fat_100g") or 0), 1),
+                "fiber_100g": round(float(n.get("fiber_100g") or 0), 1),
                 "serving_g": round(float(sq)) if sq else None,
             }}
     return {"food": None} if responded else {"food": None, "error": "lookup_unavailable"}
@@ -379,6 +385,9 @@ class FoodLogIn(BaseModel):
     grams: Optional[float] = None
     kcal: int
     protein_g: Optional[float] = None
+    carbs_g: Optional[float] = None
+    fat_g: Optional[float] = None
+    fiber_g: Optional[float] = None
 
 
 @router.post("/foods/log")
@@ -386,7 +395,8 @@ async def foods_log(body: FoodLogIn, user_id: str = Depends(get_current_user_id)
     from datetime import date
     day = date.fromisoformat(body.logged_on) if body.logged_on else _now().date()
     await _repo.insert_food_entry(
-        user_id, body.id, day, body.name, body.brand, body.grams, body.kcal, body.protein_g
+        user_id, body.id, day, body.name, body.brand, body.grams, body.kcal, body.protein_g,
+        body.carbs_g, body.fat_g, body.fiber_g,
     )
     totals = await _repo.recompute_nutrition_day(user_id, day)
     return {"status": "ok", "logged_on": day.isoformat(), "day_totals": totals}

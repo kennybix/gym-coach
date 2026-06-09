@@ -762,26 +762,36 @@ class PostgresCoachRepo:
 
     # --- itemized food entries (food-database logging) ----------------------
     async def insert_food_entry(self, user_id: str, fid: str, logged_on, name, brand,
-                                grams, kcal, protein_g) -> None:
+                                grams, kcal, protein_g, carbs_g=None, fat_g=None, fiber_g=None) -> None:
         """Idempotent (client-generated id) so offline food logging replays safely."""
         await self._pool.execute(
-            """insert into food_entries (id, user_id, logged_on, name, brand, grams, kcal, protein_g)
-               values ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8)
+            """insert into food_entries (id, user_id, logged_on, name, brand, grams, kcal,
+                                         protein_g, carbs_g, fat_g, fiber_g)
+               values ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                on conflict (id) do nothing""",
-            fid, user_id, logged_on, name, brand, grams, kcal, protein_g,
+            fid, user_id, logged_on, name, brand, grams, kcal, protein_g, carbs_g, fat_g, fiber_g,
         )
+
+    @staticmethod
+    def _macro_fields(r) -> dict:
+        return {
+            "protein_g": float(r["protein_g"]) if r["protein_g"] is not None else None,
+            "carbs_g": float(r["carbs_g"]) if r["carbs_g"] is not None else None,
+            "fat_g": float(r["fat_g"]) if r["fat_g"] is not None else None,
+            "fiber_g": float(r["fiber_g"]) if r["fiber_g"] is not None else None,
+        }
 
     async def get_food_entries(self, user_id: str, logged_on) -> list[dict]:
         rows = await self._pool.fetch(
-            """select id, name, brand, grams, kcal, protein_g from food_entries
+            """select id, name, brand, grams, kcal, protein_g, carbs_g, fat_g, fiber_g
+               from food_entries
                where user_id = $1::uuid and logged_on = $2 order by created_at""",
             user_id, logged_on,
         )
         return [{
             "id": str(r["id"]), "name": r["name"], "brand": r["brand"],
             "grams": float(r["grams"]) if r["grams"] is not None else None,
-            "kcal": r["kcal"],
-            "protein_g": float(r["protein_g"]) if r["protein_g"] is not None else None,
+            "kcal": r["kcal"], **self._macro_fields(r),
         } for r in rows]
 
     async def delete_food_entry(self, user_id: str, fid: str) -> int:
@@ -794,7 +804,7 @@ class PostgresCoachRepo:
         """Distinct recently-logged foods (most recent portion), for one-tap re-logging."""
         rows = await self._pool.fetch(
             """select distinct on (lower(name), coalesce(lower(brand), ''))
-                      name, brand, grams, kcal, protein_g, created_at
+                      name, brand, grams, kcal, protein_g, carbs_g, fat_g, fiber_g, created_at
                from food_entries where user_id = $1::uuid
                order by lower(name), coalesce(lower(brand), ''), created_at desc""",
             user_id,
@@ -802,8 +812,7 @@ class PostgresCoachRepo:
         items = [{
             "name": r["name"], "brand": r["brand"],
             "grams": float(r["grams"]) if r["grams"] is not None else None,
-            "kcal": r["kcal"],
-            "protein_g": float(r["protein_g"]) if r["protein_g"] is not None else None,
+            "kcal": r["kcal"], **self._macro_fields(r),
             "_ts": r["created_at"],
         } for r in rows]
         items.sort(key=lambda x: x["_ts"], reverse=True)
@@ -816,13 +825,19 @@ class PostgresCoachRepo:
         coach, and trends stay consistent. Food entries own the day's total when present."""
         row = await self._pool.fetchrow(
             """select coalesce(sum(kcal), 0)::int as kcal,
-                      coalesce(sum(protein_g), 0)::numeric as protein_g
+                      coalesce(sum(protein_g), 0)::numeric as protein_g,
+                      coalesce(sum(carbs_g), 0)::numeric as carbs_g,
+                      coalesce(sum(fat_g), 0)::numeric as fat_g,
+                      coalesce(sum(fiber_g), 0)::numeric as fiber_g
                from food_entries where user_id = $1::uuid and logged_on = $2""",
             user_id, logged_on,
         )
         kcal, protein = row["kcal"], float(row["protein_g"])
         await self.upsert_nutrition_day(user_id, logged_on, kcal, protein)
-        return {"kcal": kcal, "protein_g": protein}
+        return {"kcal": kcal, "protein_g": round(protein, 1),
+                "carbs_g": round(float(row["carbs_g"]), 1),
+                "fat_g": round(float(row["fat_g"]), 1),
+                "fiber_g": round(float(row["fiber_g"]), 1)}
 
     async def get_nutrition_series(self, user_id: str, window_days: int) -> list[dict]:
         rows = await self._pool.fetch(
