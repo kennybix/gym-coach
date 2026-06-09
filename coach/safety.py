@@ -316,3 +316,16 @@ def estimate_initial_target(profile: Profile, current_weight_kg: float):
     protein = int(round(1.6 * profile.goal_weight_kg / 5) * 5)
     protein = max(MIN_PROTEIN_G, min(protein, MAX_PROTEIN_G))
     return target, protein
+
+
+def estimate_maintenance(profile: Profile, current_weight_kg: float):
+    """Estimated daily maintenance energy (Mifflin-St Jeor BMR x activity multiplier) — for the
+    descriptive energy-balance view only, never a target. Returns None when automated calorie
+    framing is disabled (eating-disorder history) so the UI hides the comparison entirely."""
+    if "eating_disorder_history" in profile.medical_flags:
+        return None
+    age = max(14, date.today().year - profile.birth_year)
+    base = 10 * current_weight_kg + 6.25 * profile.height_cm - 5 * age
+    sex_term = {"male": 5, "female": -161}.get(profile.sex.value, -78)
+    tdee = (base + sex_term) * ACTIVITY_MULTIPLIER.get(profile.activity_level.value, 1.4)
+    return int(round(tdee))

@@ -24,6 +24,15 @@ type Trends = {
     sets_prescribed: number;
     sets_completed: number;
   };
+  energy: {
+    window_days: number;
+    ed_history: boolean;
+    intake_kcal_per_day: number | null;
+    days_logged: number;
+    maintenance_kcal_per_day: number | null;
+    activity_kcal_total: number;
+    weight_kg_used: number | null;
+  } | null;
 };
 
 function todayISO() {
@@ -114,6 +123,33 @@ export default function TrendsView() {
             : "A few more weigh-ins over 2+ weeks and I'll show a reliable rate. Tap a point to edit it."}
         </p>
       </Card>
+
+      {data.energy && !data.energy.ed_history && data.energy.maintenance_kcal_per_day != null && (
+        <Card delay={150}>
+          <p className="eyebrow mb-3">Energy this week · estimates</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-dim text-xs">Food in</p>
+              <p className="font-display tnum text-2xl font-bold mt-0.5">
+                {data.energy.intake_kcal_per_day != null ? `~${data.energy.intake_kcal_per_day}` : "—"}
+              </p>
+              <p className="text-dim text-[11px]">kcal/day · {data.energy.days_logged} of 7 days</p>
+            </div>
+            <div>
+              <p className="text-dim text-xs">Maintenance</p>
+              <p className="font-display tnum text-2xl font-bold mt-0.5">~{data.energy.maintenance_kcal_per_day}</p>
+              <p className="text-dim text-[11px]">kcal/day · resting + activity</p>
+            </div>
+          </div>
+          {data.energy.activity_kcal_total > 0 && (
+            <p className="text-dim text-xs mt-3">Logged workouts this week: ~{data.energy.activity_kcal_total} kcal burned.</p>
+          )}
+          <p className="text-dim text-xs mt-2 leading-relaxed">
+            Rough estimates — your <span className="text-bone/80">weight trend above</span> is the real
+            measure of whether things balance out.
+          </p>
+        </Card>
+      )}
 
       <Card delay={180}>
         <div className="flex items-center justify-between mb-3">

@@ -16,7 +16,7 @@ from typing import Optional
 
 import asyncpg
 
-from . import energy
+from . import energy, safety
 from .catalog import CatalogVariantIndex
 from .models import (
     AdherenceSummary,
@@ -483,6 +483,28 @@ class PostgresCoachRepo:
                                "sessions": r["n"], "est_kcal": kcal})
         return {"window_days": window_days, "weight_kg_used": round(weight, 1) if weight else None,
                 "total_est_kcal": total, "activities": activities}
+
+    async def get_energy_balance(self, user_id: str, window_days: int = 7) -> dict:
+        """Descriptive weekly energy picture: average intake vs estimated maintenance, with
+        logged-activity energy for context. All estimates. Hidden (ed_history) for users with
+        eating-disorder history — consistent with disabling automated calorie framing."""
+        profile = await self.get_profile(user_id)
+        ed = bool(profile and "eating_disorder_history" in profile.medical_flags)
+        weight = await self.get_latest_weight_kg(user_id)
+        nut = await self.get_nutrition_summary(user_id, window_days)
+        act = await self.get_activity_energy(user_id, window_days)
+        maintenance = (
+            safety.estimate_maintenance(profile, weight) if (profile and weight and not ed) else None
+        )
+        return {
+            "window_days": window_days,
+            "ed_history": ed,
+            "intake_kcal_per_day": round(nut.avg_kcal) if nut.avg_kcal else None,
+            "days_logged": nut.days_logged,
+            "maintenance_kcal_per_day": maintenance,
+            "activity_kcal_total": act["total_est_kcal"],
+            "weight_kg_used": round(weight, 1) if weight else None,
+        }
 
     async def get_session_history(self, user_id: str, limit: int = 30) -> list[dict]:
         """Past sessions (most recent first) with their logged sets + exercise names,

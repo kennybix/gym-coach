@@ -149,12 +149,14 @@ async def trends(window: int = 30, user_id: str = Depends(get_current_user_id)):
     trend = await _repo.get_weight_trend(user_id, window)
     adherence = await _repo.get_adherence(user_id, window)
     series = await _repo.get_weight_series(user_id, window)
+    energy_balance = await _repo.get_energy_balance(user_id, 7)
     return {
         "window_days": window,
         "goal_weight_kg": profile.goal_weight_kg,
         "weight_series": series,
         "trend": trend.model_dump(),
         "adherence": adherence.model_dump(),
+        "energy": energy_balance,
     }
 
 
