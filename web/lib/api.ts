@@ -78,6 +78,7 @@ export type ParsedEntry = {
   kind: "strength" | "cardio";
   exercise_query: string;
   exercise: CatalogMatch | null;
+  custom?: boolean;
   candidates: CatalogMatch[];
   confidence: "high" | "medium" | "low";
   note: string;

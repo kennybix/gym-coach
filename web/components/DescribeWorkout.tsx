@@ -108,12 +108,24 @@ export default function DescribeWorkout({ onClose, onLogged }: { onClose: () => 
                 <div key={i} className="field p-3 space-y-2.5">
                   <div className="flex items-center gap-2.5">
                     <ExerciseAnimation frames={e.exercise?.image_urls ?? []} alt={e.exercise?.name ?? ""} className="w-10 h-10 rounded-lg shrink-0 border border-line" />
-                    <button onClick={() => setPickFor(pickFor === i ? null : i)} className="flex-1 min-w-0 text-left active:text-volt">
-                      <span className="block text-sm font-medium truncate">{e.exercise?.name ?? "Pick an exercise"}</span>
-                      <span className="block text-dim text-[11px] truncate">
-                        {e.kind}{e.confidence === "low" ? " · low confidence" : ""}{e.note ? ` · ${e.note}` : ""}
+                    <div className="flex-1 min-w-0">
+                      {e.custom ? (
+                        <input
+                          value={e.exercise?.name ?? ""}
+                          onChange={(ev) => patch(i, { exercise: { exercise_id: ev.target.value, name: ev.target.value, equipment: "none", category: e.exercise?.category ?? null, image_urls: [] } })}
+                          placeholder="Activity name"
+                          className="field h-9 w-full px-2.5 text-sm font-medium outline-none"
+                        />
+                      ) : (
+                        <button onClick={() => setPickFor(pickFor === i ? null : i)} className="w-full text-left active:text-volt">
+                          <span className="block text-sm font-medium truncate">{e.exercise?.name ?? "Pick an exercise"}</span>
+                        </button>
+                      )}
+                      <span className="block text-dim text-[11px] truncate mt-0.5">
+                        {e.custom ? "activity" : e.kind}{e.confidence === "low" ? " · low confidence" : ""}{e.note ? ` · ${e.note}` : ""}
                       </span>
-                    </button>
+                    </div>
+                    <button onClick={() => setPickFor(pickFor === i ? null : i)} className="text-dim text-[11px] shrink-0 active:text-volt">catalog</button>
                     <button onClick={() => remove(i)} aria-label="remove" className="text-dim hover:text-alert px-1.5 text-lg shrink-0">×</button>
                   </div>
 

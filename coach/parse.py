@@ -33,9 +33,21 @@ PARSE_PROMPT = (
     "- If a treadmill/run gives speed + time, ESTIMATE distance = speed x time; assume mph unless "
     "km/h is clear, and say so in note. If distance is genuinely unclear (e.g. \"3 trips\"), set "
     "distance_m to null and note it.\n"
+    "- Sports & free activities without gym equipment (tennis, basketball, swimming, yoga, hiking, "
+    "soccer, jump rope, walking, dancing) -> kind \"cardio\", exercise_query = the activity name in "
+    "Title Case (e.g. \"Tennis\"), duration_s from the time, distance_m null unless a distance is "
+    "given. It's expected that these won't match the gym catalog.\n"
     "- Never invent exercises that weren't described. If unsure of the exact movement, give your "
     'best exercise_query and confidence "low".\n'
 )
+
+
+def _custom_exercise(name: str, kind: str) -> dict:
+    """A non-catalog activity (e.g. tennis) logged as itself. exercise_id IS the display name
+    (set_logs has no name column; name_of() falls back to the id), so it renders cleanly."""
+    nm = (name or "Activity").strip().title()[:60] or "Activity"
+    return {"exercise_id": nm, "name": nm, "equipment": "none",
+            "category": "cardio" if kind == "cardio" else None, "image_urls": []}
 
 
 def _extract_json(text: str) -> dict:
@@ -83,11 +95,14 @@ async def parse_workout(text: str, model, repo) -> dict:
         kind = "cardio" if e.get("kind") == "cardio" else "strength"
         equip = e.get("equipment") if e.get("equipment") in EQUIP else None
         candidates = repo.match_catalog(e.get("exercise_query"), equipment=equip, limit=5)
+        custom = not candidates
         entry = {
             "raw": (e.get("raw") or "")[:200],
             "kind": kind,
             "exercise_query": e.get("exercise_query") or "",
-            "exercise": candidates[0] if candidates else None,
+            # Fall back to logging the activity as itself (tennis, yoga, …) when nothing matches.
+            "exercise": candidates[0] if candidates else _custom_exercise(e.get("exercise_query"), kind),
+            "custom": custom,
             "candidates": candidates,
             "confidence": e.get("confidence") if e.get("confidence") in {"high", "medium", "low"} else "medium",
             "note": (e.get("note") or "")[:200],
