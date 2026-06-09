@@ -8,3 +8,6 @@ web/node_modules/
 web/.next/
 web/next-env.d.ts
 web/.env*.local
+
+# Next.js static export for the Capacitor native build
+web/out/

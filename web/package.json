@@ -4,9 +4,14 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "build:native": "NATIVE_BUILD=1 NEXT_PUBLIC_API_URL=https://gym-coach.taile8b1de.ts.net next build",
+    "native:sync": "npm run build:native && npx cap sync android"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
     "next": "^15.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
