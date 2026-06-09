@@ -5,6 +5,7 @@ import { enqueue } from "@/lib/queue";
 import WeightChart, { type WeightPoint } from "./WeightChart";
 import NumField from "./NumField";
 import VitalsCard from "./VitalsCard";
+import MeasurementsCard from "./MeasurementsCard";
 
 type Trends = {
   window_days: number;
@@ -173,6 +174,8 @@ export default function TrendsView() {
       </Card>
 
       <VitalsCard delay={240} />
+
+      <MeasurementsCard delay={300} />
     </Wrap>
   );
 }

@@ -476,6 +476,45 @@ async def meal_delete(body: MealDeleteIn, user_id: str = Depends(get_current_use
     return {"status": "ok"}
 
 
+# ----------------------------- body measurements -----------------------------
+class MeasurementIn(BaseModel):
+    recorded_on: Optional[str] = None
+    waist_cm: Optional[float] = None
+    chest_cm: Optional[float] = None
+    hips_cm: Optional[float] = None
+    arm_cm: Optional[float] = None
+    thigh_cm: Optional[float] = None
+    neck_cm: Optional[float] = None
+    body_fat_pct: Optional[float] = None
+    note: Optional[str] = None
+
+
+@router.post("/measurements")
+async def measurements_log(body: MeasurementIn, user_id: str = Depends(get_current_user_id)):
+    """Upsert the day's body measurements (each field optional; provided fields overwrite)."""
+    from datetime import date
+    day = date.fromisoformat(body.recorded_on) if body.recorded_on else _now().date()
+    vals = body.model_dump(exclude={"recorded_on", "note"})
+    await _repo.upsert_measurement(user_id, day, vals, body.note)
+    return {"status": "ok", "recorded_on": day.isoformat()}
+
+
+@router.get("/measurements")
+async def measurements_list(limit: int = 60, user_id: str = Depends(get_current_user_id)):
+    return {"measurements": await _repo.get_measurements(user_id, limit)}
+
+
+class MeasurementDeleteIn(BaseModel):
+    recorded_on: str
+
+
+@router.post("/measurements/delete")
+async def measurements_delete(body: MeasurementDeleteIn, user_id: str = Depends(get_current_user_id)):
+    from datetime import date
+    await _repo.delete_measurement(user_id, date.fromisoformat(body.recorded_on))
+    return {"status": "ok"}
+
+
 class NutritionIn(BaseModel):
     logged_on: Optional[str] = None  # ISO date; defaults to today
     kcal: Optional[int] = None

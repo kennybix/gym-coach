@@ -865,6 +865,66 @@ class PostgresCoachRepo:
             )
         return await self.recompute_nutrition_day(user_id, logged_on)
 
+    # --- body measurements (circumferences + body fat, one set per day) ------
+    _MEASURE_SITES = ("waist_cm", "chest_cm", "hips_cm", "arm_cm", "thigh_cm", "neck_cm", "body_fat_pct")
+
+    async def upsert_measurement(self, user_id: str, recorded_on, vals: dict, note=None) -> None:
+        await self._pool.execute(
+            """insert into body_measurements
+                 (user_id, recorded_on, waist_cm, chest_cm, hips_cm, arm_cm, thigh_cm, neck_cm, body_fat_pct, note)
+               values ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+               on conflict (user_id, recorded_on) do update set
+                 waist_cm = coalesce(excluded.waist_cm, body_measurements.waist_cm),
+                 chest_cm = coalesce(excluded.chest_cm, body_measurements.chest_cm),
+                 hips_cm  = coalesce(excluded.hips_cm,  body_measurements.hips_cm),
+                 arm_cm   = coalesce(excluded.arm_cm,   body_measurements.arm_cm),
+                 thigh_cm = coalesce(excluded.thigh_cm, body_measurements.thigh_cm),
+                 neck_cm  = coalesce(excluded.neck_cm,  body_measurements.neck_cm),
+                 body_fat_pct = coalesce(excluded.body_fat_pct, body_measurements.body_fat_pct),
+                 note = coalesce(excluded.note, body_measurements.note)""",
+            user_id, recorded_on, vals.get("waist_cm"), vals.get("chest_cm"), vals.get("hips_cm"),
+            vals.get("arm_cm"), vals.get("thigh_cm"), vals.get("neck_cm"), vals.get("body_fat_pct"), note,
+        )
+
+    async def get_measurements(self, user_id: str, limit: int = 60) -> list[dict]:
+        rows = await self._pool.fetch(
+            """select recorded_on::text as date, waist_cm, chest_cm, hips_cm, arm_cm, thigh_cm,
+                      neck_cm, body_fat_pct, note
+               from body_measurements where user_id = $1::uuid order by recorded_on desc limit $2""",
+            user_id, limit,
+        )
+        out = []
+        for r in rows:
+            d = {"date": r["date"], "note": r["note"]}
+            for s in self._MEASURE_SITES:
+                d[s] = float(r[s]) if r[s] is not None else None
+            out.append(d)
+        return out
+
+    async def delete_measurement(self, user_id: str, recorded_on) -> int:
+        status = await self._pool.execute(
+            "delete from body_measurements where user_id = $1::uuid and recorded_on = $2",
+            user_id, recorded_on,
+        )
+        return int(status.rsplit(" ", 1)[-1])
+
+    async def get_recent_measurements(self, user_id: str, window_days: int = 90) -> dict:
+        """Latest value + change-over-window per site, for the coach. Circumference/body-fat
+        are objective fat-loss signals — reference them factually, never as appearance judgment."""
+        rows = await self._pool.fetch(
+            """select recorded_on, waist_cm, chest_cm, hips_cm, arm_cm, thigh_cm, neck_cm, body_fat_pct
+               from body_measurements
+               where user_id = $1::uuid and recorded_on >= current_date - $2::int
+               order by recorded_on""",
+            user_id, window_days,
+        )
+        sites = {}
+        for s in self._MEASURE_SITES:
+            vals = [(r["recorded_on"], float(r[s])) for r in rows if r[s] is not None]
+            if vals:
+                sites[s] = {"latest": vals[-1][1], "change": round(vals[-1][1] - vals[0][1], 1), "n": len(vals)}
+        return {"window_days": window_days, "sites": sites}
+
     async def recompute_nutrition_day(self, user_id: str, logged_on) -> dict:
         """Set the day's nutrition_logs total to the sum of its food entries, so the summary,
         coach, and trends stay consistent. Food entries own the day's total when present."""

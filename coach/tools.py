@@ -78,8 +78,17 @@ def build_read_tools(repo: CoachRepo) -> list:
         uid = config["configurable"]["user_id"]
         return json.dumps(await repo.get_activity_energy(uid, window_days))
 
+    @tool
+    async def get_recent_measurements(window_days: int, config: RunnableConfig) -> str:
+        """The user's body measurements (waist, chest, hips, arm, thigh, neck, body-fat %) — the
+        latest value and change over the window per site. These are objective fat-loss signals;
+        reference them factually (e.g. 'waist down 2 cm'), never as appearance commentary."""
+        import json
+        uid = config["configurable"]["user_id"]
+        return json.dumps(await repo.get_recent_measurements(uid, window_days))
+
     return [get_weight_trend, get_adherence, get_nutrition_summary, get_current_targets,
-            get_recent_vitals, get_today_plan, get_activity_energy]
+            get_recent_vitals, get_today_plan, get_activity_energy, get_recent_measurements]
 
 
 def build_propose_tools(repo: CoachRepo) -> list:
