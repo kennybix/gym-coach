@@ -3,6 +3,7 @@ import "./globals.css";
 import SwRegister from "@/components/SwRegister";
 import DevAutoConfig from "@/components/DevAutoConfig";
 import NavBar from "@/components/NavBar";
+import NativeShell from "@/components/NativeShell";
 
 export const metadata: Metadata = {
   title: "Gym Coach",
@@ -17,6 +18,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  // Required so env(safe-area-inset-*) is populated under the status bar / gesture nav — the
+  // native WebView (Capacitor) renders edge-to-edge and won't pad for the bars otherwise.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -33,7 +37,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-dvh flex flex-col">
         <SwRegister />
         <DevAutoConfig />
-        <main className="flex-1 w-full max-w-md mx-auto px-5 pt-7 pb-28">{children}</main>
+        <NativeShell />
+        {/* Top/bottom padding fold in the safe-area insets (0 in a normal browser, the status-bar
+            / gesture-bar heights in the native WebView), so the header clears the clock and content
+            clears the nav bar. */}
+        <main
+          className="flex-1 w-full max-w-md mx-auto px-5"
+          style={{
+            paddingTop: "calc(1.75rem + env(safe-area-inset-top))",
+            paddingBottom: "calc(7rem + env(safe-area-inset-bottom))",
+          }}
+        >
+          {children}
+        </main>
         <NavBar />
       </body>
     </html>

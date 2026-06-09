@@ -10,6 +10,15 @@ const config: CapacitorConfig = {
     // allow the app's https://localhost origin to reach the tailnet backend
     allowMixedContent: false,
   },
+  plugins: {
+    // Edge-to-edge dark UI: status bar overlays the WebView with light icons; CSS safe-area
+    // padding (viewport-fit=cover) clears it. Set here too so it applies before JS runs.
+    StatusBar: {
+      overlaysWebView: true,
+      style: "DARK",
+      backgroundColor: "#00000000",
+    },
+  },
 };
 
 export default config;

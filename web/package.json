@@ -13,6 +13,7 @@
     "@capacitor/android": "^7.6.6",
     "@capacitor/cli": "^7.6.6",
     "@capacitor/core": "^7.6.6",
+    "@capacitor/status-bar": "^7.0.6",
     "@kiwi-health/capacitor-health-connect": "^0.0.42",
     "next": "^15.3.0",
     "react": "^19.0.0",
