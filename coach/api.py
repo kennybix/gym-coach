@@ -12,6 +12,9 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
+
+from . import media
 from pydantic import BaseModel, Field
 
 from . import safety as safety_mod
@@ -512,6 +515,52 @@ class MeasurementDeleteIn(BaseModel):
 async def measurements_delete(body: MeasurementDeleteIn, user_id: str = Depends(get_current_user_id)):
     from datetime import date
     await _repo.delete_measurement(user_id, date.fromisoformat(body.recorded_on))
+    return {"status": "ok"}
+
+
+# ----------------------------- progress photos -------------------------------
+class PhotoIn(BaseModel):
+    image: str  # data URL (downscaled jpeg) from the device camera
+    taken_on: Optional[str] = None
+    pose: Optional[str] = None
+    caption: Optional[str] = None
+
+
+@router.post("/photos")
+async def photo_upload(body: PhotoIn, user_id: str = Depends(get_current_user_id)):
+    from datetime import date
+    if not body.image.startswith("data:image/"):
+        raise HTTPException(400, "expected a base64 image data URL")
+    day = date.fromisoformat(body.taken_on) if body.taken_on else _now().date()
+    try:
+        filename = media.save_data_url(user_id, body.image)
+    except ValueError:
+        raise HTTPException(400, "bad image")
+    return {"status": "ok", "photo": await _repo.save_photo(user_id, day, body.pose, filename, body.caption)}
+
+
+@router.get("/photos")
+async def photos_list(user_id: str = Depends(get_current_user_id)):
+    return {"photos": await _repo.list_photos(user_id)}
+
+
+@router.get("/photos/{photo_id}")
+async def photo_image(photo_id: str, user_id: str = Depends(get_current_user_id)):
+    p = await _repo.get_photo(user_id, photo_id)
+    if not p:
+        raise HTTPException(404, "not found")
+    return FileResponse(media.image_path(user_id, p["filename"]))
+
+
+class PhotoDeleteIn(BaseModel):
+    id: str
+
+
+@router.post("/photos/delete")
+async def photo_delete(body: PhotoDeleteIn, user_id: str = Depends(get_current_user_id)):
+    filename = await _repo.delete_photo(user_id, body.id)
+    if filename:
+        media.delete_file(user_id, filename)
     return {"status": "ok"}
 
 

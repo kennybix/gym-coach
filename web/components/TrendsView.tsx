@@ -6,6 +6,7 @@ import WeightChart, { type WeightPoint } from "./WeightChart";
 import NumField from "./NumField";
 import VitalsCard from "./VitalsCard";
 import MeasurementsCard from "./MeasurementsCard";
+import ProgressPhotos from "./ProgressPhotos";
 
 type Trends = {
   window_days: number;
@@ -176,6 +177,8 @@ export default function TrendsView() {
       <VitalsCard delay={240} />
 
       <MeasurementsCard delay={300} />
+
+      <ProgressPhotos delay={360} />
     </Wrap>
   );
 }

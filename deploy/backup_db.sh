@@ -18,6 +18,16 @@ out="$BACKUP_DIR/coachdb-$stamp.sql.gz"
 pg_dump --no-owner --no-privileges "$COACH_DB_URI" | gzip > "$out"
 echo "backup written: $out ($(du -h "$out" | cut -f1))"
 
+# Progress photos live on disk (not in the DB) — tar them alongside the dump so a restore is complete.
+PHOTO_DIR="${PHOTO_DIR:-$HOME/.local/share/gym-coach/photos}"
+if [ -d "$PHOTO_DIR" ] && [ -n "$(ls -A "$PHOTO_DIR" 2>/dev/null)" ]; then
+  photos_out="$BACKUP_DIR/photos-$stamp.tar.gz"
+  tar -czf "$photos_out" -C "$(dirname "$PHOTO_DIR")" "$(basename "$PHOTO_DIR")"
+  echo "photos backed up: $photos_out ($(du -h "$photos_out" | cut -f1))"
+  mapfile -t oldp < <(ls -1t "$BACKUP_DIR"/photos-*.tar.gz 2>/dev/null | tail -n +$((KEEP + 1)))
+  [ "${#oldp[@]}" -gt 0 ] && printf '%s\n' "${oldp[@]}" | xargs -r rm -f
+fi
+
 # Rotate: keep the newest $KEEP, delete the rest.
 mapfile -t old < <(ls -1t "$BACKUP_DIR"/coachdb-*.sql.gz 2>/dev/null | tail -n +$((KEEP + 1)))
 if [ "${#old[@]}" -gt 0 ]; then

@@ -925,6 +925,47 @@ class PostgresCoachRepo:
                 sites[s] = {"latest": vals[-1][1], "change": round(vals[-1][1] - vals[0][1], 1), "n": len(vals)}
         return {"window_days": window_days, "sites": sites}
 
+    # --- progress photos (metadata; bytes live on disk via media.py) ---------
+    async def save_photo(self, user_id: str, taken_on, pose, filename: str, caption=None) -> dict:
+        row = await self._pool.fetchrow(
+            """insert into progress_photos (user_id, taken_on, pose, filename, caption)
+               values ($1::uuid, $2, $3, $4, $5) returning id, taken_on::text as date, pose, caption""",
+            user_id, taken_on, pose, filename, caption,
+        )
+        return {"id": str(row["id"]), "date": row["date"], "pose": row["pose"],
+                "caption": row["caption"], "coach_note": None}
+
+    async def list_photos(self, user_id: str, limit: int = 60) -> list[dict]:
+        rows = await self._pool.fetch(
+            """select id, taken_on::text as date, pose, caption, coach_note
+               from progress_photos where user_id = $1::uuid
+               order by taken_on desc, created_at desc limit $2""",
+            user_id, limit,
+        )
+        return [{"id": str(r["id"]), "date": r["date"], "pose": r["pose"],
+                 "caption": r["caption"], "coach_note": r["coach_note"]} for r in rows]
+
+    async def get_photo(self, user_id: str, photo_id: str) -> Optional[dict]:
+        r = await self._pool.fetchrow(
+            "select id, filename, coach_note from progress_photos where id = $1::uuid and user_id = $2::uuid",
+            photo_id, user_id,
+        )
+        return {"id": str(r["id"]), "filename": r["filename"], "coach_note": r["coach_note"]} if r else None
+
+    async def set_photo_note(self, user_id: str, photo_id: str, note: str) -> None:
+        await self._pool.execute(
+            "update progress_photos set coach_note = $3 where id = $1::uuid and user_id = $2::uuid",
+            photo_id, user_id, note,
+        )
+
+    async def delete_photo(self, user_id: str, photo_id: str) -> Optional[str]:
+        """Delete the row and return its filename so the caller can remove the file."""
+        r = await self._pool.fetchrow(
+            "delete from progress_photos where id = $1::uuid and user_id = $2::uuid returning filename",
+            photo_id, user_id,
+        )
+        return r["filename"] if r else None
+
     async def recompute_nutrition_day(self, user_id: str, logged_on) -> dict:
         """Set the day's nutrition_logs total to the sum of its food entries, so the summary,
         coach, and trends stay consistent. Food entries own the day's total when present."""

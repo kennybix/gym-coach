@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import api as rest_api
 from .auth import get_current_user_id
-from . import energy
+from . import energy, media
 from .graph import build_coach_graph, summarize_evidence
 from .parse import parse_workout
 from .vision import parse_food_photo
@@ -143,6 +143,43 @@ async def parse_food_photo_ep(body: FoodPhotoIn, user_id: str = Depends(get_curr
     if not (body.image or "").startswith("data:image/"):
         return {"items": []}
     return await parse_food_photo(body.image, body.note, model)
+
+
+_PROGRESS_PHOTO_PROMPT = (
+    "You are a supportive fitness coach looking at a user's progress photo. Give 2-3 sentences of "
+    "constructive, encouraging feedback on training progress and conditioning — posture, visible "
+    "muscle tone or conditioning changes, and what to keep doing. Be respectful and non-judgmental: "
+    "never shame, never comment on weight as a number, never use clinical or appearance-shaming "
+    "language. If you can't tell much, say so kindly and suggest a consistent angle/lighting next time."
+)
+
+
+class PhotoNoteIn(BaseModel):
+    photo_id: str
+
+
+@app.post("/coach/photo-note")
+async def photo_note_ep(body: PhotoNoteIn, user_id: str = Depends(get_current_user_id)):
+    """Vision feedback on a progress photo. Disabled for eating-disorder history (no appearance
+    framing for at-risk users — consistent with the rest of the safety layer)."""
+    model = _state.get("insight_model")
+    if model is None:
+        raise HTTPException(503, "coach unavailable: LLM provider not configured")
+    repo = _state["repo"]
+    profile = await repo.get_profile(user_id)
+    if profile and "eating_disorder_history" in profile.medical_flags:
+        return {"note": None, "disabled": True}
+    p = await repo.get_photo(user_id, body.photo_id)
+    if not p:
+        raise HTTPException(404, "photo not found")
+    msg = HumanMessage(content=[
+        {"type": "text", "text": _PROGRESS_PHOTO_PROMPT},
+        {"type": "image_url", "image_url": {"url": media.read_data_url(user_id, p["filename"])}},
+    ])
+    resp = await model.ainvoke([msg])
+    note = (resp.content if isinstance(resp.content, str) else str(resp.content)).strip()[:1000]
+    await repo.set_photo_note(user_id, body.photo_id, note)
+    return {"note": note, "disabled": False}
 
 
 class ConfirmIn(BaseModel):
