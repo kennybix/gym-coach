@@ -2,16 +2,37 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import ExportData from "@/components/ExportData";
+import { isNative, syncHealthConnect } from "@/lib/health";
 
 export default function SettingsPage() {
   const [base, setBase] = useState("");
   const [tok, setTok] = useState("");
   const [saved, setSaved] = useState(false);
+  const [native, setNative] = useState(false);
+  const [hcBusy, setHcBusy] = useState(false);
+  const [hcMsg, setHcMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setBase(localStorage.getItem("coach_api_base") || "");
     setTok(localStorage.getItem("coach_token") || "");
+    setNative(isNative());
   }, []);
+
+  const syncHealth = async () => {
+    setHcBusy(true);
+    setHcMsg(null);
+    const r = await syncHealthConnect();
+    if ("error" in r) {
+      setHcMsg(
+        r.error === "NotInstalled" ? "Health Connect isn't set up on this phone yet."
+        : r.error === "NotSupported" ? "This device doesn't support Health Connect."
+        : "Couldn't sync — make sure you granted Health Connect access."
+      );
+    } else {
+      setHcMsg(`Imported ${r.weights} weigh-in${r.weights === 1 ? "" : "s"} and ${r.vitals} vitals reading${r.vitals === 1 ? "" : "s"}.`);
+    }
+    setHcBusy(false);
+  };
 
   const save = () => {
     localStorage.setItem("coach_api_base", base.trim());
@@ -70,6 +91,22 @@ export default function SettingsPage() {
           {saved ? "Saved ✓" : "Save"}
         </button>
       </div>
+
+      {native && (
+        <div className="card p-5 rise space-y-3">
+          <div>
+            <p className="eyebrow">Health Connect</p>
+            <p className="text-dim text-xs mt-1 leading-relaxed">
+              Pull your weight, blood pressure and resting heart rate from Health Connect (the last
+              90 days) so you don&apos;t have to type them in.
+            </p>
+          </div>
+          <button onClick={syncHealth} disabled={hcBusy} className="btn btn-primary w-full h-11">
+            {hcBusy ? "Syncing…" : "Sync from Health Connect"}
+          </button>
+          {hcMsg && <p className="text-dim text-xs">{hcMsg}</p>}
+        </div>
+      )}
 
       <ExportData />
 

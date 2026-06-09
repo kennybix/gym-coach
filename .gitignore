@@ -11,3 +11,6 @@ web/.env*.local
 
 # Next.js static export for the Capacitor native build
 web/out/
+
+# built APK served for sideload (not committed)
+web/public/*.apk

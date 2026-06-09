@@ -1,0 +1,23 @@
+diff --git a/node_modules/@kiwi-health/capacitor-health-connect/android/build.gradle b/node_modules/@kiwi-health/capacitor-health-connect/android/build.gradle
+index 1ec9f2e..4343dcc 100644
+--- a/node_modules/@kiwi-health/capacitor-health-connect/android/build.gradle
++++ b/node_modules/@kiwi-health/capacitor-health-connect/android/build.gradle
+@@ -7,7 +7,7 @@ ext {
+ }
+ 
+ buildscript {
+-    ext.kotlin_version = "1.8.20"
++    ext.kotlin_version = "1.9.25"
+     repositories {
+         google()
+         mavenCentral()
+@@ -44,6 +44,9 @@ android {
+         sourceCompatibility JavaVersion.VERSION_17
+         targetCompatibility JavaVersion.VERSION_17
+     }
++    kotlinOptions {
++        jvmTarget = "17"
++    }
+ }
+ 
+ repositories {
