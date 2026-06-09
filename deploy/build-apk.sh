@@ -15,6 +15,7 @@ JDK="$(find "$HOME/jdk" -maxdepth 1 -name 'jdk-21*' -type d | head -1)"
 [ -n "$JDK" ] || { echo "Need a full JDK 21 in ~/jdk (download Temurin 21)"; exit 1; }
 export JAVA_HOME="$JDK" PATH="$JDK/bin:$PATH"
 
+rm -f public/gym-coach.apk            # don't bundle a previous APK into the static export (size bloat)
 npm run build:native                 # static export -> web/out (absolute tailnet API URL baked)
 npx cap sync android                 # copy web/out + plugins into the android project
 ( cd android && ./gradlew assembleDebug --no-daemon )
