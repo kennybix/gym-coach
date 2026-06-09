@@ -103,6 +103,30 @@ export async function parseWorkout(
   return res.json();
 }
 
+export type FoodPhotoItem = {
+  name: string;
+  grams: number | null;
+  kcal: number;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  fiber_g: number | null;
+  confidence: "high" | "medium" | "low";
+};
+export async function parseFoodPhoto(
+  image: string,
+  note?: string
+): Promise<{ items: FoodPhotoItem[] } | { unavailable: true }> {
+  const res = await fetch(`${apiBase()}/coach/parse-food-photo`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ image, note }),
+  });
+  if (res.status === 503) return { unavailable: true };
+  if (!res.ok) throw new Error(`parse-food-photo -> ${res.status}`);
+  return res.json();
+}
+
 /* ---- coach endpoints (separate from /api; may be 503 if no LLM configured) ---- */
 export type Evidence = { label: string; detail: string };
 export type CoachReply =

@@ -11,6 +11,7 @@ import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException
 from langchain.chat_models import init_chat_model
@@ -26,6 +27,7 @@ from .auth import get_current_user_id
 from . import energy
 from .graph import build_coach_graph, summarize_evidence
 from .parse import parse_workout
+from .vision import parse_food_photo
 from .insight import generate_insight
 from .review import build_review_graph
 from .pg_repo import PostgresCoachRepo
@@ -124,6 +126,23 @@ async def parse_workout_ep(body: ParseWorkoutIn, user_id: str = Depends(get_curr
         ex = e.get("exercise") or {}
         e["est_kcal"] = energy.estimate_kcal(ex.get("name", ""), e.get("duration_s"), e.get("distance_m"), weight)
     return result
+
+
+class FoodPhotoIn(BaseModel):
+    image: str  # data URL (downscaled jpeg/png base64) from the device camera
+    note: Optional[str] = None
+
+
+@app.post("/coach/parse-food-photo")
+async def parse_food_photo_ep(body: FoodPhotoIn, user_id: str = Depends(get_current_user_id)):
+    """Estimate food items + portion grams + macros from a photo, for the user to confirm and
+    log. No DB write. 503 if no LLM configured."""
+    model = _state.get("insight_model")
+    if model is None:
+        raise HTTPException(503, "coach unavailable: LLM provider not configured")
+    if not (body.image or "").startswith("data:image/"):
+        return {"items": []}
+    return await parse_food_photo(body.image, body.note, model)
 
 
 class ConfirmIn(BaseModel):
