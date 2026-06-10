@@ -157,14 +157,14 @@ export default function DescribeWorkout({ onClose, onLogged }: { onClose: () => 
 
                   {e.kind === "cardio" ? (
                     <div className="grid grid-cols-2 gap-2.5">
-                      <NumField value={Math.round((e.duration_s ?? 0) / 60)} onChange={(v) => patch(i, { duration_s: Math.round(v * 60) })} step={1} min={0} max={600} unit="min" compact />
-                      <NumField value={+(((e.distance_m ?? 0) / 1000).toFixed(1))} onChange={(v) => patch(i, { distance_m: Math.round(v * 1000) })} step={0.1} min={0} max={300} decimals={1} unit="km" compact />
+                      <L label="Time (min)"><NumField value={Math.round((e.duration_s ?? 0) / 60)} onChange={(v) => patch(i, { duration_s: Math.round(v * 60) })} step={1} min={0} max={600} compact /></L>
+                      <L label="Distance (km)"><NumField value={+(((e.distance_m ?? 0) / 1000).toFixed(1))} onChange={(v) => patch(i, { distance_m: Math.round(v * 1000) })} step={0.1} min={0} max={300} decimals={1} compact /></L>
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 gap-2">
-                      <NumField value={e.sets ?? 1} onChange={(v) => patch(i, { sets: Math.max(1, Math.round(v)) })} step={1} min={1} max={20} unit="sets" compact />
-                      <NumField value={e.reps ?? 1} onChange={(v) => patch(i, { reps: Math.max(1, Math.round(v)) })} step={1} min={1} max={100} unit="reps" compact />
-                      <NumField value={e.weight_kg ?? 0} onChange={(v) => patch(i, { weight_kg: v })} step={2.5} min={0} max={1000} decimals={1} unit="kg" compact />
+                      <L label="Sets"><NumField value={e.sets ?? 1} onChange={(v) => patch(i, { sets: Math.max(1, Math.round(v)) })} step={1} min={1} max={20} compact /></L>
+                      <L label="Reps"><NumField value={e.reps ?? 1} onChange={(v) => patch(i, { reps: Math.max(1, Math.round(v)) })} step={1} min={1} max={100} compact /></L>
+                      <L label="kg"><NumField value={e.weight_kg ?? 0} onChange={(v) => patch(i, { weight_kg: v })} step={2.5} min={0} max={1000} decimals={1} compact /></L>
                     </div>
                   )}
                 </div>
@@ -186,6 +186,16 @@ export default function DescribeWorkout({ onClose, onLogged }: { onClose: () => 
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/* label above a (number-only) stepper, so the value isn't squeezed out in a tight grid cell */
+function L({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-dim text-[11px] mb-1 truncate">{label}</p>
+      {children}
     </div>
   );
 }

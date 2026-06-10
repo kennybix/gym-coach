@@ -43,7 +43,7 @@ export default function NumField({
     onChange(decimals > 0 ? +next.toFixed(decimals) : Math.round(next));
   };
 
-  const btn = compact ? "w-9 h-10 text-xl" : "w-12 h-14 text-2xl";
+  const btn = compact ? "w-8 h-10 text-xl" : "w-11 h-14 text-2xl";
   const num = compact ? "text-lg" : "text-2xl";
   return (
     <div className="field flex items-center min-w-0 overflow-hidden">
@@ -76,9 +76,9 @@ export default function NumField({
             focused.current = false;
             setText(fmt(value, decimals));
           }}
-          className={`min-w-0 flex-1 bg-transparent text-center font-display tnum ${num} font-bold outline-none`}
+          className={`flex-1 min-w-[2ch] bg-transparent text-center font-display tnum ${num} font-bold outline-none`}
         />
-        {unit && <span className="text-dim text-[11px] shrink-0">{unit}</span>}
+        {unit && <span className="text-dim text-[11px] min-w-0 shrink truncate">{unit}</span>}
       </div>
       <button
         type="button"
