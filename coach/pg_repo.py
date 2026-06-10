@@ -584,9 +584,17 @@ class PostgresCoachRepo:
                 group by date order by date""",
             user_id, exercise_id,
         )
+        detail = self._catalog.detail_of(exercise_id)
         return {
             "exercise_id": exercise_id,
             "name": self._catalog.name_of(exercise_id),
+            "primary_muscles": detail["primary_muscles"],
+            "secondary_muscles": detail["secondary_muscles"],
+            "mechanic": detail["mechanic"],
+            "force": detail["force"],
+            "level": detail["level"],
+            "cues": detail["cues"],
+            "image_urls": detail["image_urls"],
             "best_e1rm": round(float(agg["best_e1rm"]), 1) if agg["best_e1rm"] is not None else None,
             "heaviest_kg": float(agg["heaviest_kg"]) if agg["heaviest_kg"] is not None else None,
             "total_sets": agg["total_sets"] or 0,

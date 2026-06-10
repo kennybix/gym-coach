@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { exerciseStats, type ExerciseStats } from "@/lib/api";
 import ExerciseAnimation from "./ExerciseAnimation";
+import MuscleMap from "./MuscleMap";
 
 export default function ExerciseDetail({
   exerciseId,
@@ -43,35 +44,68 @@ export default function ExerciseDetail({
         {err && <p className="text-dim text-sm">Couldn&apos;t load stats — try again when you&apos;re online.</p>}
         {!err && !stats && <div className="h-40 card animate-pulse" />}
 
-        {stats && (stats.total_sets === 0 ? (
-          <p className="text-dim text-sm leading-relaxed">
-            No logged sets for this exercise yet. Log a few and your estimated-1RM progression and
-            personal bests will show up here.
-          </p>
-        ) : (
+        {stats && (
           <>
-            <div className="grid grid-cols-2 gap-2.5">
-              <Stat label="Best est. 1RM" value={stats.best_e1rm != null ? `${stats.best_e1rm} kg` : "—"} accent />
-              <Stat label="Heaviest" value={stats.heaviest_kg != null ? `${stats.heaviest_kg} kg` : "—"} />
-              <Stat label="Total sets" value={String(stats.total_sets)} />
-              <Stat label="Total volume" value={`${stats.total_volume.toLocaleString()} kg`} />
-            </div>
-
-            {stats.best_set && (
-              <p className="text-dim text-xs mt-3">
-                Best set: <span className="text-bone/90 tnum">{stats.best_set.weight_kg} kg × {stats.best_set.reps}</span>
-                {" "}(est. 1RM {stats.best_set.e1rm} kg)
-              </p>
+            {(stats.primary_muscles.length > 0 || stats.secondary_muscles.length > 0) && (
+              <>
+                <p className="eyebrow mb-2">Muscles worked</p>
+                <MuscleMap primary={stats.primary_muscles} secondary={stats.secondary_muscles} />
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {stats.primary_muscles.map((m) => (
+                    <span key={`p${m}`} className="chip px-2.5 py-1 text-[11px] font-semibold text-ink bg-volt border-volt capitalize">{m}</span>
+                  ))}
+                  {stats.secondary_muscles.map((m) => (
+                    <span key={`s${m}`} className="chip px-2.5 py-1 text-[11px] text-dim capitalize">{m}</span>
+                  ))}
+                </div>
+                <p className="text-dim text-[11px] mt-1.5">Filled = main muscles · outline = assisting</p>
+              </>
             )}
 
-            <p className="eyebrow mt-5 mb-2">Estimated 1RM over time</p>
-            {stats.series.length >= 2 ? (
-              <E1rmChart series={stats.series} />
+            {(stats.mechanic || stats.force || stats.level) && (
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {[stats.mechanic, stats.force, stats.level].filter(Boolean).map((t) => (
+                  <span key={t} className="chip px-2.5 py-1 text-[11px] text-dim capitalize">{t}</span>
+                ))}
+              </div>
+            )}
+
+            {stats.cues.length > 0 && (
+              <>
+                <p className="eyebrow mt-5 mb-2">How to do it</p>
+                <ol className="space-y-2 text-sm text-bone/85 list-decimal list-inside marker:text-dim">
+                  {stats.cues.slice(0, 5).map((c, i) => <li key={i} className="leading-snug">{c}</li>)}
+                </ol>
+              </>
+            )}
+
+            <p className="eyebrow mt-5 mb-2">Your progress</p>
+            {stats.total_sets === 0 ? (
+              <p className="text-dim text-sm leading-relaxed">No logged sets yet — log a few and your personal bests + estimated-1RM trend show up here.</p>
             ) : (
-              <p className="text-dim text-xs">Log this exercise across more sessions to see the trend line.</p>
+              <>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <Stat label="Best est. 1RM" value={stats.best_e1rm != null ? `${stats.best_e1rm} kg` : "—"} accent />
+                  <Stat label="Heaviest" value={stats.heaviest_kg != null ? `${stats.heaviest_kg} kg` : "—"} />
+                  <Stat label="Total sets" value={String(stats.total_sets)} />
+                  <Stat label="Total volume" value={`${stats.total_volume.toLocaleString()} kg`} />
+                </div>
+                {stats.best_set && (
+                  <p className="text-dim text-xs mt-3">
+                    Best set: <span className="text-bone/90 tnum">{stats.best_set.weight_kg} kg × {stats.best_set.reps}</span>
+                    {" "}(est. 1RM {stats.best_set.e1rm} kg)
+                  </p>
+                )}
+                {stats.series.length >= 2 && (
+                  <>
+                    <p className="eyebrow mt-5 mb-2">Estimated 1RM over time</p>
+                    <E1rmChart series={stats.series} />
+                  </>
+                )}
+              </>
             )}
           </>
-        ))}
+        )}
       </div>
     </div>
   );

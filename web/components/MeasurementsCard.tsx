@@ -3,9 +3,10 @@
    Each field shows its name ABOVE a full-width stepper (so the number is always visible in a
    2-col grid), with a "How to measure" guide since people don't always know where to measure. */
 import { useCallback, useEffect, useState } from "react";
-import { apiGet, configured } from "@/lib/api";
+import { apiGet, apiPost, configured } from "@/lib/api";
 import { enqueue } from "@/lib/queue";
 import NumField from "./NumField";
+import BodyMap from "./BodyMap";
 
 type Measurement = {
   date: string; note: string | null;
@@ -55,6 +56,11 @@ export default function MeasurementsCard({ delay = 0 }: { delay?: number }) {
     setTimeout(load, 400);
   };
 
+  const remove = async (date: string) => {
+    setList((xs) => xs.filter((m) => m.date !== date));
+    await apiPost("/api/measurements/delete", { recorded_on: date });
+  };
+
   const change = (key: keyof Measurement): number | null => {
     const pts = [...list].reverse().map((m) => m[key] as number | null).filter((x): x is number => x != null);
     return pts.length >= 2 ? +(pts[pts.length - 1] - pts[0]).toFixed(1) : null;
@@ -68,7 +74,11 @@ export default function MeasurementsCard({ delay = 0 }: { delay?: number }) {
           {help ? "Hide" : "How to measure"}
         </button>
       </div>
-      <p className="text-dim text-xs mb-3.5">Tape measure, on bare skin, relaxed. Fill in what you track — leave the rest at 0.</p>
+      <p className="text-dim text-xs mb-2">Tape measure, on bare skin, relaxed. The figure shows where each one goes; fill in what you track.</p>
+
+      <div className="mx-auto max-w-[220px] mb-1">
+        <BodyMap vals={vals} />
+      </div>
 
       {help && (
         <ul className="mb-4 space-y-1.5 text-xs leading-snug">
@@ -107,9 +117,10 @@ export default function MeasurementsCard({ delay = 0 }: { delay?: number }) {
           {list.slice(0, 6).map((m) => {
             const parts = SITES.filter((s) => m[s.key] != null).map((s) => `${s.label} ${m[s.key]}${s.unit === "%" ? "%" : ""}`);
             return (
-              <li key={m.date} className="py-2 text-sm flex items-baseline justify-between gap-3">
-                <span className="text-bone/90 tnum truncate">{parts.join(" · ") || "—"}</span>
+              <li key={m.date} className="py-2 text-sm flex items-baseline gap-2.5">
+                <span className="text-bone/90 tnum truncate flex-1 min-w-0">{parts.join(" · ") || "—"}</span>
                 <span className="text-dim text-[11px] shrink-0">{new Date(m.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+                <button onClick={() => remove(m.date)} aria-label="delete entry" className="text-dim hover:text-alert px-1 text-base leading-none shrink-0">×</button>
               </li>
             );
           })}

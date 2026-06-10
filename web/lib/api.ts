@@ -56,6 +56,13 @@ export type ProgramSlot = {
 export type ExerciseStats = {
   exercise_id: string;
   name: string;
+  primary_muscles: string[];
+  secondary_muscles: string[];
+  mechanic: string | null;
+  force: string | null;
+  level: string | null;
+  cues: string[];
+  image_urls: string[];
   best_e1rm: number | null;
   heaviest_kg: number | null;
   total_sets: number;

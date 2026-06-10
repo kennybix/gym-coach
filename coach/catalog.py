@@ -31,6 +31,11 @@ class CatalogVariantIndex:
         self._images = {e["id"]: e.get("image_urls", []) for e in exercises}
         self._cues = {e["id"]: e.get("cues", []) for e in exercises}
         self._category = {e["id"]: e.get("category") for e in exercises}
+        self._primary = {e["id"]: e.get("primary_muscles", []) for e in exercises}
+        self._secondary = {e["id"]: e.get("secondary_muscles", []) for e in exercises}
+        self._mechanic = {e["id"]: e.get("mechanic") for e in exercises}
+        self._force = {e["id"]: e.get("force") for e in exercises}
+        self._level = {e["id"]: e.get("difficulty") for e in exercises}
         self._all = exercises
         self._group_for: dict[str, dict] = {}
         for g in variant_groups:
@@ -107,6 +112,11 @@ class CatalogVariantIndex:
             "image_urls": self._images.get(exercise_id, []),
             "cues": self._cues.get(exercise_id, []),
             "category": self._category.get(exercise_id),
+            "primary_muscles": self._primary.get(exercise_id, []),
+            "secondary_muscles": self._secondary.get(exercise_id, []),
+            "mechanic": self._mechanic.get(exercise_id),
+            "force": self._force.get(exercise_id),
+            "level": self._level.get(exercise_id),
         }
 
     def find_equipment_variant(
