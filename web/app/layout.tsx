@@ -21,6 +21,9 @@ export const viewport: Viewport = {
   // Required so env(safe-area-inset-*) is populated under the status bar / gesture nav — the
   // native WebView (Capacitor) renders edge-to-edge and won't pad for the bars otherwise.
   viewportFit: "cover",
+  // When the soft keyboard opens, resize the layout (don't pan the window) so fixed elements —
+  // the bottom nav, the coach input — stay put instead of being pushed off-screen.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
