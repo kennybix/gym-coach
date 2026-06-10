@@ -1031,6 +1031,22 @@ class PostgresCoachRepo:
             goal_weight_kg, weekly_rate_kg, json.dumps(medical_flags),
         )
 
+    async def update_profile(self, user_id: str, *, sex=None, birth_year=None, height_cm=None,
+                             activity_level=None, goal_weight_kg=None, weekly_rate_kg=None) -> None:
+        """Partial update of editable profile fields (each None = leave unchanged). Does not
+        touch medical_flags or recompute targets — those have their own gated paths."""
+        await self._pool.execute(
+            """update profiles set
+                 sex = coalesce($2, sex),
+                 birth_year = coalesce($3, birth_year),
+                 height_cm = coalesce($4, height_cm),
+                 activity_level = coalesce($5, activity_level),
+                 goal_weight_kg = coalesce($6, goal_weight_kg),
+                 weekly_rate_kg = coalesce($7, weekly_rate_kg)
+               where user_id = $1::uuid""",
+            user_id, sex, birth_year, height_cm, activity_level, goal_weight_kg, weekly_rate_kg,
+        )
+
     async def create_program(self, user_id: str, name: str, sessions_per_week: int,
                              exercises: list[dict]) -> str:
         """Replaces the active program (old ones are kept inactive for history)."""

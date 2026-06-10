@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import ExportData from "@/components/ExportData";
+import ProfileEditor from "@/components/ProfileEditor";
 import { isNative, syncHealthConnect } from "@/lib/health";
 
 export default function SettingsPage() {
@@ -44,6 +45,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-5">
       <h1 className="font-display text-[28px] font-bold rise">Setup</h1>
+
+      <ProfileEditor />
 
       <Link href="/program" className="card p-4 rise flex items-center justify-between active:bg-panel2">
         <span>

@@ -89,7 +89,7 @@ export default function MeasurementsCard({ delay = 0 }: { delay?: number }) {
       <p className="text-dim text-xs mb-2">Tape measure, on bare skin, relaxed. The figure shows where each one goes; fill in what you track.</p>
 
       <div className="mx-auto max-w-[220px] mb-1">
-        <BodyMap vals={vals} />
+        <BodyMap vals={vals} sex={profile?.sex} />
       </div>
 
       {help && (

@@ -597,6 +597,40 @@ async def onboarding_status(user_id: str = Depends(get_current_user_id)):
         return {"onboarded": False}
 
 
+@router.get("/profile")
+async def get_profile_ep(user_id: str = Depends(get_current_user_id)):
+    """The user's stored details (profiles table): sex, birth year, height, activity, goal."""
+    try:
+        return (await _repo.get_profile(user_id)).model_dump(mode="json")
+    except LookupError:
+        raise HTTPException(404, "not onboarded yet")
+
+
+class ProfileUpdateIn(BaseModel):
+    sex: Optional[str] = None
+    birth_year: Optional[int] = None
+    height_cm: Optional[float] = None
+    activity_level: Optional[str] = None
+    goal_weight_kg: Optional[float] = None
+    weekly_rate_kg: Optional[float] = None
+
+
+@router.post("/profile")
+async def update_profile_ep(body: ProfileUpdateIn, user_id: str = Depends(get_current_user_id)):
+    """Edit stored details. The goal rate is capped server-side; targets are NOT recomputed
+    here (they come from onboarding / the coach's gated path)."""
+    if body.sex is not None and body.sex not in ("male", "female", "other"):
+        raise HTTPException(400, "sex must be male, female, or other")
+    rate = body.weekly_rate_kg
+    if rate is not None:
+        rate = min(max(rate, 0.0), safety_mod.MAX_SAFE_WEEKLY_RATE_KG)
+    await _repo.update_profile(
+        user_id, sex=body.sex, birth_year=body.birth_year, height_cm=body.height_cm,
+        activity_level=body.activity_level, goal_weight_kg=body.goal_weight_kg, weekly_rate_kg=rate,
+    )
+    return {"status": "ok"}
+
+
 class OnboardIn(BaseModel):
     sex: str
     birth_year: int

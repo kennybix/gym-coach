@@ -172,6 +172,25 @@ export default function TrendsView() {
             <button onClick={removeWeight} className="text-xs text-alert font-medium shrink-0 ml-3">Remove</button>
           )}
         </div>
+
+        {data.weight_series.length > 0 && (
+          <>
+            <p className="text-dim text-xs mt-4 mb-1">Your weigh-ins — tap one to edit or remove it:</p>
+            <ul className="divide-y divide-line">
+              {[...data.weight_series].reverse().slice(0, 8).map((p) => (
+                <li key={p.date}>
+                  <button
+                    onClick={() => setSelected(p.date)}
+                    className={`w-full py-2 flex items-baseline justify-between gap-3 text-sm ${p.date === selected ? "text-volt" : "text-bone/90"}`}
+                  >
+                    <span className="tnum font-medium">{p.weight_kg} kg</span>
+                    <span className="text-dim text-xs">{pretty(p.date)}{p.date === selected ? " · editing" : ""}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </Card>
 
       <VitalsCard delay={240} />
