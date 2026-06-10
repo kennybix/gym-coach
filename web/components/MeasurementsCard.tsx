@@ -7,34 +7,39 @@ import { apiGet, apiPost, configured } from "@/lib/api";
 import { enqueue } from "@/lib/queue";
 import NumField from "./NumField";
 import BodyMap from "./BodyMap";
+import { navyBodyFat, waistToHeight } from "@/lib/bodyfat";
 
 type Measurement = {
   date: string; note: string | null;
-  waist_cm: number | null; chest_cm: number | null; hips_cm: number | null;
+  waist_cm: number | null; belly_cm: number | null; chest_cm: number | null; hips_cm: number | null;
   arm_cm: number | null; thigh_cm: number | null; neck_cm: number | null; body_fat_pct: number | null;
 };
+type Profile = { sex: string | null; height_cm: number | null };
 
 const SITES: { key: keyof Measurement; label: string; unit: string; step: number; tip: string }[] = [
-  { key: "waist_cm", label: "Waist", unit: "cm", step: 0.5, tip: "Around the narrowest point — usually just above the navel. Stand relaxed, breathe out, don't suck in." },
+  { key: "waist_cm", label: "Waist", unit: "cm", step: 0.5, tip: "Narrowest point of your torso — usually just above the navel. Relaxed, breathe out, don't suck in." },
+  { key: "belly_cm", label: "Belly", unit: "cm", step: 0.5, tip: "Right around the navel (where the belly is widest). This is the one the body-fat estimate uses for men." },
   { key: "hips_cm", label: "Hips", unit: "cm", step: 0.5, tip: "Around the widest part of your hips and glutes, feet together." },
   { key: "chest_cm", label: "Chest", unit: "cm", step: 0.5, tip: "Across the fullest part, tape under the armpits and level all the way round." },
   { key: "arm_cm", label: "Arm", unit: "cm", step: 0.5, tip: "Around the biggest part of your upper arm (bicep), arm relaxed at your side." },
   { key: "thigh_cm", label: "Thigh", unit: "cm", step: 0.5, tip: "Around the largest part of your upper thigh, just below the glute." },
-  { key: "neck_cm", label: "Neck", unit: "cm", step: 0.5, tip: "Just below the Adam's apple; let the tape slope slightly down at the front." },
-  { key: "body_fat_pct", label: "Body fat", unit: "%", step: 0.5, tip: "From a smart scale, calipers, or a body-fat estimate — enter the % only if you have it." },
+  { key: "neck_cm", label: "Neck", unit: "cm", step: 0.5, tip: "Just below the Adam's apple; let the tape slope slightly down at the front. Needed for the body-fat estimate." },
+  { key: "body_fat_pct", label: "Body fat", unit: "%", step: 0.5, tip: "You don't need calipers — log your neck + belly (+ hips) and we estimate it for you below. Or type a smart-scale/caliper number here." },
 ];
 
 export default function MeasurementsCard({ delay = 0 }: { delay?: number }) {
   const [list, setList] = useState<Measurement[]>([]);
   const [vals, setVals] = useState<Record<string, number>>({});
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [savedTick, setSavedTick] = useState(false);
   const [help, setHelp] = useState(false);
 
   const load = useCallback(() => {
     if (!configured()) return;
-    apiGet<{ measurements: Measurement[] }>("/api/measurements?limit=60")
+    apiGet<{ measurements: Measurement[]; profile: Profile | null }>("/api/measurements?limit=60")
       .then((d) => {
         setList(d.measurements);
+        setProfile(d.profile);
         const latest = d.measurements[0];
         if (latest) {
           const v: Record<string, number> = {};
@@ -65,6 +70,13 @@ export default function MeasurementsCard({ delay = 0 }: { delay?: number }) {
     const pts = [...list].reverse().map((m) => m[key] as number | null).filter((x): x is number => x != null);
     return pts.length >= 2 ? +(pts[pts.length - 1] - pts[0]).toFixed(1) : null;
   };
+
+  const estBf = navyBodyFat({
+    sex: profile?.sex ?? null, height: profile?.height_cm ?? null,
+    waist: vals.waist_cm, belly: vals.belly_cm, neck: vals.neck_cm, hips: vals.hips_cm,
+  });
+  const whtr = waistToHeight(vals.waist_cm, profile?.height_cm ?? null);
+  const female = (profile?.sex || "").toLowerCase().startsWith("f");
 
   return (
     <div className="card p-5 rise" style={{ animationDelay: `${delay}ms` }}>
@@ -107,6 +119,27 @@ export default function MeasurementsCard({ delay = 0 }: { delay?: number }) {
           </div>
         ))}
       </div>
+
+      {estBf != null ? (
+        <div className="field p-3 mt-3.5 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-dim text-xs">Estimated body fat</p>
+            <p className="font-display text-xl font-bold text-volt tnum leading-tight">{estBf}%</p>
+            <p className="text-dim text-[11px]">US Navy method, from your measurements · an estimate</p>
+          </div>
+          <button onClick={() => setVals((p) => ({ ...p, body_fat_pct: estBf }))} className="btn btn-ghost h-9 px-3 text-sm shrink-0">Use this</button>
+        </div>
+      ) : profile ? (
+        <p className="text-dim text-xs mt-3.5">
+          Add your <span className="text-bone/80">neck</span> and <span className="text-bone/80">{female ? "waist + hips" : "belly"}</span> to estimate body fat automatically — no calipers needed.
+        </p>
+      ) : null}
+
+      {whtr != null && (
+        <p className="text-dim text-xs mt-2">
+          Waist-to-height ratio <span className="text-bone/80 tnum">{whtr}</span>{whtr < 0.5 ? " · in the healthy range (under 0.5)" : " · general guideline is under 0.5"}
+        </p>
+      )}
 
       <button onClick={save} className="btn btn-primary w-full h-11 mt-3.5">
         {savedTick ? "Saved ✓" : "Log measurements"}

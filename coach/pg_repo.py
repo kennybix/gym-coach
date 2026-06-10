@@ -874,15 +874,16 @@ class PostgresCoachRepo:
         return await self.recompute_nutrition_day(user_id, logged_on)
 
     # --- body measurements (circumferences + body fat, one set per day) ------
-    _MEASURE_SITES = ("waist_cm", "chest_cm", "hips_cm", "arm_cm", "thigh_cm", "neck_cm", "body_fat_pct")
+    _MEASURE_SITES = ("waist_cm", "belly_cm", "chest_cm", "hips_cm", "arm_cm", "thigh_cm", "neck_cm", "body_fat_pct")
 
     async def upsert_measurement(self, user_id: str, recorded_on, vals: dict, note=None) -> None:
         await self._pool.execute(
             """insert into body_measurements
-                 (user_id, recorded_on, waist_cm, chest_cm, hips_cm, arm_cm, thigh_cm, neck_cm, body_fat_pct, note)
-               values ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                 (user_id, recorded_on, waist_cm, belly_cm, chest_cm, hips_cm, arm_cm, thigh_cm, neck_cm, body_fat_pct, note)
+               values ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
                on conflict (user_id, recorded_on) do update set
                  waist_cm = coalesce(excluded.waist_cm, body_measurements.waist_cm),
+                 belly_cm = coalesce(excluded.belly_cm, body_measurements.belly_cm),
                  chest_cm = coalesce(excluded.chest_cm, body_measurements.chest_cm),
                  hips_cm  = coalesce(excluded.hips_cm,  body_measurements.hips_cm),
                  arm_cm   = coalesce(excluded.arm_cm,   body_measurements.arm_cm),
@@ -890,13 +891,14 @@ class PostgresCoachRepo:
                  neck_cm  = coalesce(excluded.neck_cm,  body_measurements.neck_cm),
                  body_fat_pct = coalesce(excluded.body_fat_pct, body_measurements.body_fat_pct),
                  note = coalesce(excluded.note, body_measurements.note)""",
-            user_id, recorded_on, vals.get("waist_cm"), vals.get("chest_cm"), vals.get("hips_cm"),
-            vals.get("arm_cm"), vals.get("thigh_cm"), vals.get("neck_cm"), vals.get("body_fat_pct"), note,
+            user_id, recorded_on, vals.get("waist_cm"), vals.get("belly_cm"), vals.get("chest_cm"),
+            vals.get("hips_cm"), vals.get("arm_cm"), vals.get("thigh_cm"), vals.get("neck_cm"),
+            vals.get("body_fat_pct"), note,
         )
 
     async def get_measurements(self, user_id: str, limit: int = 60) -> list[dict]:
         rows = await self._pool.fetch(
-            """select recorded_on::text as date, waist_cm, chest_cm, hips_cm, arm_cm, thigh_cm,
+            """select recorded_on::text as date, waist_cm, belly_cm, chest_cm, hips_cm, arm_cm, thigh_cm,
                       neck_cm, body_fat_pct, note
                from body_measurements where user_id = $1::uuid order by recorded_on desc limit $2""",
             user_id, limit,
@@ -920,7 +922,7 @@ class PostgresCoachRepo:
         """Latest value + change-over-window per site, for the coach. Circumference/body-fat
         are objective fat-loss signals — reference them factually, never as appearance judgment."""
         rows = await self._pool.fetch(
-            """select recorded_on, waist_cm, chest_cm, hips_cm, arm_cm, thigh_cm, neck_cm, body_fat_pct
+            """select recorded_on, waist_cm, belly_cm, chest_cm, hips_cm, arm_cm, thigh_cm, neck_cm, body_fat_pct
                from body_measurements
                where user_id = $1::uuid and recorded_on >= current_date - $2::int
                order by recorded_on""",

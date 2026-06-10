@@ -483,6 +483,7 @@ async def meal_delete(body: MealDeleteIn, user_id: str = Depends(get_current_use
 class MeasurementIn(BaseModel):
     recorded_on: Optional[str] = None
     waist_cm: Optional[float] = None
+    belly_cm: Optional[float] = None
     chest_cm: Optional[float] = None
     hips_cm: Optional[float] = None
     arm_cm: Optional[float] = None
@@ -504,7 +505,14 @@ async def measurements_log(body: MeasurementIn, user_id: str = Depends(get_curre
 
 @router.get("/measurements")
 async def measurements_list(limit: int = 60, user_id: str = Depends(get_current_user_id)):
-    return {"measurements": await _repo.get_measurements(user_id, limit)}
+    # sex + height let the client estimate body fat (US Navy method) from the tape measurements
+    profile = None
+    try:
+        p = await _repo.get_profile(user_id)
+        profile = {"sex": p.sex, "height_cm": p.height_cm}
+    except LookupError:
+        pass
+    return {"measurements": await _repo.get_measurements(user_id, limit), "profile": profile}
 
 
 class MeasurementDeleteIn(BaseModel):
