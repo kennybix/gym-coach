@@ -272,6 +272,7 @@ export default function SessionLogger() {
         <div className="fixed inset-0 z-50 bg-ink/70 backdrop-blur-sm flex items-end" onClick={() => setShowAdd(false)}>
           <div
             className="w-full max-w-md mx-auto card rounded-b-none p-5 max-h-[82dvh] overflow-auto scroll-soft"
+            style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">

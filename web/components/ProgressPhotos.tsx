@@ -101,7 +101,7 @@ export default function ProgressPhotos({ delay = 0 }: { delay?: number }) {
 
       {open && (
         <div className="fixed inset-0 z-50 bg-ink/80 backdrop-blur-sm flex items-end" onClick={() => setOpen(null)}>
-          <div className="w-full max-w-md mx-auto card rounded-b-none p-5 max-h-[90dvh] overflow-auto scroll-soft" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md mx-auto card rounded-b-none p-5 max-h-[90dvh] overflow-auto scroll-soft" style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <p className="eyebrow">{new Date(open.date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "long", day: "numeric" })}</p>
               <button onClick={() => setOpen(null)} className="text-dim px-1.5 text-xl leading-none">×</button>

@@ -56,7 +56,7 @@ export default function FoodPhoto({ date, onClose, onLogged }: { date: string; o
 
   return (
     <div className="fixed inset-0 z-50 bg-ink/70 backdrop-blur-sm flex items-end" onClick={onClose}>
-      <div className="w-full max-w-md mx-auto card rounded-b-none p-5 max-h-[88dvh] overflow-auto scroll-soft" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md mx-auto card rounded-b-none p-5 max-h-[88dvh] overflow-auto scroll-soft" style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <p className="eyebrow">Photo a meal</p>
           <button onClick={onClose} className="text-dim px-1.5 text-xl leading-none">×</button>
