@@ -24,6 +24,9 @@ html {
 body {
   font-family: var(--font-body);
   color: var(--color-bone);
+  /* app-wide guard: a too-wide element clips instead of shoving the whole page sideways.
+     `clip` (not `hidden`) doesn't create a scroll container, so position:sticky keeps working. */
+  overflow-x: clip;
   /* a soft glow at the top instead of flat black + grain */
   background: radial-gradient(125% 75% at 50% -12%, #161922 0%, var(--color-ink) 58%) fixed;
   -webkit-tap-highlight-color: transparent;

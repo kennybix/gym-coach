@@ -155,21 +155,22 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
         </div>
       )}
 
-      {/* search + scan */}
-      <div className="flex gap-2">
+      {/* search + scan — input shrinks (min-w-0), buttons keep size (shrink-0) so the row
+          never overflows the card */}
+      <div className="flex gap-2 min-w-0">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && search()}
-          placeholder="Search foods (e.g. chicken breast)"
-          className="field flex-1 h-11 px-3.5 text-sm outline-none"
+          placeholder="Search foods…"
+          className="field flex-1 min-w-0 h-11 px-3.5 text-sm outline-none"
           autoCapitalize="off"
         />
-        <button onClick={search} disabled={searching} className="btn btn-primary px-4 text-sm">{searching ? "…" : "Search"}</button>
-        <button onClick={() => { setScanning(true); setNotice(null); }} aria-label="scan barcode" className="btn btn-ghost px-3" title="Scan barcode">
+        <button onClick={search} disabled={searching} className="btn btn-primary px-3.5 text-sm shrink-0">{searching ? "…" : "Search"}</button>
+        <button onClick={() => { setScanning(true); setNotice(null); }} aria-label="scan barcode" className="btn btn-ghost px-2.5 shrink-0" title="Scan barcode">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14M21 5v14" /></svg>
         </button>
-        <button onClick={() => setPhoto(true)} aria-label="photo a meal" className="btn btn-ghost px-3" title="Photo a meal">
+        <button onClick={() => setPhoto(true)} aria-label="photo a meal" className="btn btn-ghost px-2.5 shrink-0" title="Photo a meal">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
         </button>
       </div>
