@@ -28,6 +28,7 @@ class ReviewState(TypedDict):
     nutrition: Optional[dict]
     vitals: Optional[dict]
     energy: Optional[dict]
+    measurements: Optional[dict]
     assessment: Optional[dict]
     committed_changes: dict
 
@@ -41,7 +42,11 @@ REVIEW_PROMPT = (
     "gently suggest a professional check rather than interpreting it. If energy.maintenance_"
     "kcal_per_day is present, you MAY note the rough intake-vs-maintenance picture "
     "descriptively (estimates; the weight trend is the real signal) — never as a target or a "
-    "verdict, and skip it entirely when it is null. Propose a calorie-"
+    "verdict, and skip it entirely when it is null. If measurements.sites has data, you MAY "
+    "cite a circumference change factually (e.g. 'waist down 2 cm') as an objective fat-loss "
+    "signal — never as appearance commentary; especially call out RECOMPOSITION when the waist "
+    "or belly is falling while body weight holds steady (fat down, muscle kept — a real win the "
+    "scale hides). Propose a calorie-"
     "target change ONLY if the data clearly supports it — e.g. a genuine stall alongside "
     "good adherence. Be conservative: small adjustments beat big ones, and no change is a "
     "valid outcome."
@@ -63,6 +68,8 @@ def build_review_graph(repo: CoachRepo, model_id: str = "google_genai:gemini-3.5
             "nutrition": (await repo.get_nutrition_summary(uid, w)).model_dump(),
             "vitals": await repo.get_vitals_summary(uid, w),
             "energy": await repo.get_energy_balance(uid, w),
+            # wider window: measurements are logged infrequently, so 90d gives a real change
+            "measurements": await repo.get_recent_measurements(uid, max(w, 90)),
         }
 
     async def assess(state: ReviewState) -> dict:
@@ -76,6 +83,7 @@ def build_review_graph(repo: CoachRepo, model_id: str = "google_genai:gemini-3.5
             "nutrition": state["nutrition"],
             "vitals": state.get("vitals"),
             "energy": state.get("energy"),
+            "measurements": state.get("measurements"),
         }
         result: ReviewAssessment = await assessor.ainvoke(
             REVIEW_PROMPT + "\n\nDATA:\n" + str(payload)

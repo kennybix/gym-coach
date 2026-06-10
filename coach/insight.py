@@ -14,7 +14,10 @@ from .repo import CoachRepo
 INSIGHT_PROMPT = (
     "You are the user's training coach. From this data snapshot, write ONE short, specific, "
     "encouraging observation about what stands out RIGHT NOW — a weight trend, a logging "
-    "streak, training adherence, or a vitals trend. Max 2 sentences, about 30 words. Ground "
+    "streak, training adherence, a vitals trend, or a body-measurement change. If measurements "
+    "show a waist/belly drop while body weight holds steady, that's recomposition (fat down, "
+    "muscle kept) — a great thing to surface, stated factually, never as appearance commentary. "
+    "Max 2 sentences, about 30 words. Ground "
     "every number in the data; never invent. If the data is too thin to say anything real, "
     "give a gentle nudge to log consistently. Not medical advice; if a vitals reading is "
     "clearly concerning, suggest a professional check rather than interpreting it. No "
@@ -28,6 +31,7 @@ _FOCUS_HINT = {
     "training": "Focus on training adherence and consistency this time.",
     "nutrition": "Focus on nutrition logging and intake vs target this time.",
     "vitals": "Focus on the blood-pressure / heart-rate trend this time.",
+    "measurements": "Focus on body-measurement changes (waist/belly) and recomposition this time.",
 }
 
 
@@ -44,6 +48,7 @@ async def generate_insight(repo: CoachRepo, model, user_id: str, focus: str = "a
         "adherence_14d": (await repo.get_adherence(user_id, 14)).model_dump(),
         "nutrition_14d": (await repo.get_nutrition_summary(user_id, 14)).model_dump(),
         "vitals_30d": await repo.get_vitals_summary(user_id, 30),
+        "measurements_90d": await repo.get_recent_measurements(user_id, 90),
         "current_targets": (
             t.model_dump() if (t := await repo.get_current_targets(user_id)) else None
         ),

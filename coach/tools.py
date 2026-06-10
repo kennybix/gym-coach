@@ -80,9 +80,11 @@ def build_read_tools(repo: CoachRepo) -> list:
 
     @tool
     async def get_recent_measurements(window_days: int, config: RunnableConfig) -> str:
-        """The user's body measurements (waist, chest, hips, arm, thigh, neck, body-fat %) — the
-        latest value and change over the window per site. These are objective fat-loss signals;
-        reference them factually (e.g. 'waist down 2 cm'), never as appearance commentary."""
+        """The user's body measurements (waist, belly, chest, hips, arm, thigh, neck, body-fat %)
+        — the latest value and change over the window per site. These are objective fat-loss
+        signals; reference them factually (e.g. 'waist down 2 cm'), never as appearance
+        commentary. If the waist or belly falls while body weight holds steady, that's
+        recomposition (fat lost, muscle kept) — worth pointing out, since the scale hides it."""
         import json
         uid = config["configurable"]["user_id"]
         return json.dumps(await repo.get_recent_measurements(uid, window_days))

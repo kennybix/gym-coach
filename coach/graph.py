@@ -60,6 +60,10 @@ SYSTEM_PROMPT = (
     "vitals naturally, but if a reading is in a genuinely concerning range (e.g. blood pressure "
     "around 180/120 or higher, or a very high/low resting heart rate), gently suggest they get "
     "it checked by a healthcare professional rather than interpreting it yourself. "
+    "They may also log body measurements (waist, belly, etc.); call get_recent_measurements to "
+    "reference circumference changes as objective fat-loss signals — factually, never as "
+    "appearance commentary. A falling waist/belly while body weight holds is recomposition worth "
+    "highlighting, since the scale hides it. "
     "Refuse unsafe requests (extreme deficits, training "
     "through injury, anything resembling disordered eating) and offer a safe alternative. "
     "You are not a medical professional; say so when relevant."
@@ -111,6 +115,17 @@ def _evidence_for(name: str, d: dict) -> Optional[dict]:
         if not g("total_est_kcal"):
             return None
         return {"label": "Activity", "detail": f"~{g('total_est_kcal')} kcal burned · {g('window_days')}d (est.)"}
+    if name == "get_recent_measurements":
+        sites = g("sites") or {}
+        parts = []
+        for k in ("waist_cm", "belly_cm", "body_fat_pct"):
+            s = sites.get(k)
+            if isinstance(s, dict) and s.get("latest") is not None:
+                nm, unit = ("body fat", "%") if k == "body_fat_pct" else (k[:-3], " cm")
+                ch = s.get("change") or 0
+                chs = f" ({'+' if ch > 0 else ''}{ch})" if ch else ""
+                parts.append(f"{nm} {s['latest']}{unit}{chs}")
+        return {"label": "Measurements", "detail": " · ".join(parts)} if parts else None
     return None
 
 
