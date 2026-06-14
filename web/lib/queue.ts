@@ -13,7 +13,10 @@ export type QueueItem = {
   ts: number;
   path: string; // e.g. /api/sets/sync
   body: unknown;
+  attempts?: number; // server-side (5xx) failures, to drop a poison item rather than block forever
 };
+
+const MAX_ATTEMPTS = 6;
 
 const DB = "gymlog";
 const STORE = "pending";
@@ -52,9 +55,13 @@ export async function pendingCount(): Promise<number> {
 
 let flushing = false;
 
-/** Replays queued writes oldest-first; stops at the first network failure. */
+/** Replays queued writes oldest-first. A network outage stops the pass (retried later); a bad
+ *  payload (4xx) is dropped; a server error (5xx) on ONE item is skipped so it can't block the
+ *  rest (head-of-line), and dropped after MAX_ATTEMPTS so a poison item can't jam the queue
+ *  forever. Note: we do NOT gate on navigator.onLine — the native WebView sometimes misreports
+ *  it; if we're really offline the first request just fails and the pass stops. */
 export async function flush(): Promise<void> {
-  if (flushing || typeof navigator === "undefined" || !navigator.onLine) return;
+  if (flushing || typeof navigator === "undefined") return;
   flushing = true;
   try {
     const items = (await withStore("readonly", (s) => s.getAll())) as QueueItem[];
@@ -63,14 +70,20 @@ export async function flush(): Promise<void> {
       try {
         await apiPost(item.path, item.body);
       } catch (err) {
-        // 4xx = bad payload, will never succeed -> drop it; otherwise keep + stop.
-        const msg = String(err);
-        const m = msg.match(/-> (\d+)/);
-        if (m && Number(m[1]) >= 400 && Number(m[1]) < 500) {
-          await withStore("readwrite", (s) => s.delete(item.id));
+        const m = String(err).match(/-> (\d+)/);
+        if (!m) break; // no HTTP status = network/unreachable -> stop, retry on next trigger
+        const status = Number(m[1]);
+        if (status >= 400 && status < 500) {
+          await withStore("readwrite", (s) => s.delete(item.id)); // bad payload, never succeeds
           continue;
         }
-        break;
+        // 5xx: server reachable but this item errored. Count it; drop if poison, else keep — and
+        // CONTINUE so an independent write (e.g. a vital) behind it still gets delivered.
+        const attempts = (item.attempts ?? 0) + 1;
+        await withStore("readwrite", (s) =>
+          attempts >= MAX_ATTEMPTS ? s.delete(item.id) : s.put({ ...item, attempts })
+        );
+        continue;
       }
       await withStore("readwrite", (s) => s.delete(item.id));
     }

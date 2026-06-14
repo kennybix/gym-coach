@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { apiGet, configured, exerciseStats, type ProgramSlot } from "@/lib/api";
-import { enqueue, installQueueAutoFlush, subscribeQueue } from "@/lib/queue";
+import { enqueue, subscribeQueue } from "@/lib/queue";
 import CatalogSearch, { type CatalogRow } from "./CatalogSearch";
 import DescribeWorkout from "./DescribeWorkout";
 import ExerciseAnimation from "./ExerciseAnimation";
@@ -75,15 +75,13 @@ export default function SessionLogger() {
   useEffect(() => {
     setSession(loadSession());
     setOnline(navigator.onLine);
-    const un1 = subscribeQueue(setQueued);
-    const un2 = installQueueAutoFlush();
+    const un1 = subscribeQueue(setQueued); // auto-flush is installed app-globally (QueueSync)
     const on = () => setOnline(true);
     const off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
     return () => {
       un1();
-      un2();
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
     };
