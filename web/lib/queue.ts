@@ -80,9 +80,11 @@ export async function flush(): Promise<void> {
         // 5xx: server reachable but this item errored. Count it; drop if poison, else keep — and
         // CONTINUE so an independent write (e.g. a vital) behind it still gets delivered.
         const attempts = (item.attempts ?? 0) + 1;
-        await withStore("readwrite", (s) =>
-          attempts >= MAX_ATTEMPTS ? s.delete(item.id) : s.put({ ...item, attempts })
-        );
+        if (attempts >= MAX_ATTEMPTS) {
+          await withStore("readwrite", (s) => s.delete(item.id));
+        } else {
+          await withStore("readwrite", (s) => s.put({ ...item, attempts }));
+        }
         continue;
       }
       await withStore("readwrite", (s) => s.delete(item.id));
