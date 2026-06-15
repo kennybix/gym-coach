@@ -399,6 +399,18 @@ class PostgresCoachRepo:
             session_id, user_id,
         )
         if not owned:
+            # Self-heal: the session's `start` write may have been lost or arrived out of order
+            # (offline queue). Recreate it for THIS user against their active program (idempotent),
+            # so the sets aren't orphaned, then re-check. start_session only inserts for the
+            # caller's own user_id, so a forged/foreign session_id still won't attach.
+            from datetime import datetime, timezone
+            started_at = next((s["logged_at"] for s in sets if s.get("logged_at")), None) or datetime.now(timezone.utc)
+            await self.start_session(user_id, session_id, started_at)
+            owned = await self._pool.fetchval(
+                "select 1 from sessions where session_id = $1::uuid and user_id = $2::uuid",
+                session_id, user_id,
+            )
+        if not owned:
             raise PermissionError(f"session {session_id!r} not found for user {user_id!r}")
         inserted = 0
         async with self._pool.acquire() as con:

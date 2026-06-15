@@ -73,9 +73,14 @@ class SetSyncIn(BaseModel):
 
 @router.post("/sets/sync")
 async def sets_sync(body: SetSyncIn, user_id: str = Depends(get_current_user_id)):
-    inserted = await _repo.insert_set_logs(
-        user_id, body.session_id, [s.model_dump() for s in body.sets]
-    )
+    try:
+        inserted = await _repo.insert_set_logs(
+            user_id, body.session_id, [s.model_dump() for s in body.sets]
+        )
+    except PermissionError:
+        # Session can't be attached (no active program, or not this user's). Permanent for this
+        # payload — return 4xx so the offline queue DROPS it instead of retrying a 500 forever.
+        raise HTTPException(422, "session not found or not attachable")
     return {"status": "ok", "received": len(body.sets), "inserted": inserted}
 
 
