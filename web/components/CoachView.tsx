@@ -4,6 +4,8 @@ import {
   coachChat,
   coachConfirm,
   coachLatestReview,
+  coachThreadMessages,
+  coachThreads,
   configured,
   type CoachReply,
   type Review,
@@ -68,6 +70,8 @@ export default function CoachView() {
   const [review, setReview] = useState<Review>(null);
   const [ready, setReady] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [serverIds, setServerIds] = useState<Set<string>>(new Set());
+  const fetched = useRef<Set<string>>(new Set());
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,7 +80,27 @@ export default function CoachView() {
     setSessions(s);
     const stored = localStorage.getItem(AKEY);
     setActiveId(stored && s.some((x) => x.id === stored) ? stored : s[0].id);
-    if (configured()) coachLatestReview().then(setReview);
+    if (configured()) {
+      coachLatestReview().then(setReview);
+      // hydrate the thread list from the server so history survives a reinstall
+      coachThreads().then((threads) => {
+        if (!threads.length) return;
+        setServerIds(new Set(threads.map((t) => t.thread_id)));
+        setSessions((prev) => {
+          const byId = new Map(prev.map((x) => [x.id, x]));
+          for (const t of threads) {
+            if (!byId.has(t.thread_id)) {
+              byId.set(t.thread_id, { id: t.thread_id, title: t.title, msgs: [], updated: Date.parse(t.updated) || Date.now() });
+            }
+          }
+          // drop the throwaway empty "New chat" if the server gave us real history
+          const merged = Array.from(byId.values()).filter(
+            (x) => x.msgs.length > 0 || byId.size === 1 || new Set(threads.map((t) => t.thread_id)).has(x.id)
+          );
+          return merged.sort((a, b) => b.updated - a.updated);
+        });
+      });
+    }
     // a tapped Today insight hands off a question to start from
     const prefill = localStorage.getItem("coach_prefill");
     if (prefill) {
@@ -90,6 +114,23 @@ export default function CoachView() {
     localStorage.setItem(SKEY, JSON.stringify(sessions));
     if (activeId) localStorage.setItem(AKEY, activeId);
   }, [sessions, activeId, ready]);
+
+  // when a server-restored thread (empty locally) is opened, pull its transcript
+  useEffect(() => {
+    if (!activeId || !serverIds.has(activeId) || fetched.current.has(activeId)) return;
+    const s = sessions.find((x) => x.id === activeId);
+    if (!s || s.msgs.length > 0) return;
+    fetched.current.add(activeId);
+    coachThreadMessages(activeId).then((ms) => {
+      if (!ms.length) return;
+      const msgs: Msg[] = ms.map((m) => ({
+        role: m.role === "coach" ? "coach" : m.role === "system" ? "system" : "user",
+        text: m.text,
+        evidence: m.evidence || undefined,
+      }));
+      setSessions((prev) => prev.map((x) => (x.id === activeId ? { ...x, msgs, title: x.title || titleFrom(msgs) } : x)));
+    });
+  }, [activeId, serverIds, sessions]);
 
   const active = useMemo(() => sessions.find((s) => s.id === activeId), [sessions, activeId]);
   const msgs = active?.msgs ?? [];

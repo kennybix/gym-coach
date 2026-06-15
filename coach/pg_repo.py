@@ -1047,6 +1047,41 @@ class PostgresCoachRepo:
             user_id, sex, birth_year, height_cm, activity_level, goal_weight_kg, weekly_rate_kg,
         )
 
+    # --- coach chat transcript (server-side, survives reinstall) -------------
+    async def save_coach_message(self, user_id: str, thread_id: str, role: str, text: str, evidence=None) -> None:
+        await self._pool.execute(
+            "insert into coach_messages (user_id, thread_id, role, text, evidence) values ($1::uuid,$2,$3,$4,$5)",
+            user_id, thread_id, role, text, json.dumps(evidence) if evidence else None,
+        )
+
+    async def list_coach_threads(self, user_id: str, limit: int = 50) -> list[dict]:
+        rows = await self._pool.fetch(
+            """select thread_id, max(created_at) as updated, count(*) as n,
+                      (array_agg(text order by created_at) filter (where role = 'user'))[1] as first_user
+               from coach_messages where user_id = $1::uuid
+               group by thread_id order by max(created_at) desc limit $2""",
+            user_id, limit,
+        )
+        out = []
+        for r in rows:
+            title = (r["first_user"] or "New chat").strip()
+            out.append({"thread_id": r["thread_id"], "title": (title[:38] + "…") if len(title) > 38 else title,
+                        "updated": r["updated"].isoformat(), "count": r["n"]})
+        return out
+
+    async def get_coach_messages(self, user_id: str, thread_id: str) -> list[dict]:
+        rows = await self._pool.fetch(
+            "select role, text, evidence from coach_messages where user_id = $1::uuid and thread_id = $2 order by created_at",
+            user_id, thread_id,
+        )
+        out = []
+        for r in rows:
+            ev = r["evidence"]
+            if isinstance(ev, str):
+                ev = json.loads(ev)
+            out.append({"role": r["role"], "text": r["text"], "evidence": ev})
+        return out
+
     async def create_program(self, user_id: str, name: str, sessions_per_week: int,
                              exercises: list[dict]) -> str:
         """Replaces the active program (old ones are kept inactive for history)."""

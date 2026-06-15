@@ -94,17 +94,28 @@ async def chat(body: ChatIn, user_id: str = Depends(get_current_user_id)):
     if graph is None:
         raise HTTPException(503, "coach unavailable: LLM provider not configured")
     config = _cfg(user_id, body.thread_id)
+    repo = _state["repo"]
+    await repo.save_coach_message(user_id, body.thread_id, "user", body.message)
     result = await graph.ainvoke({"messages": [HumanMessage(body.message)]}, config=config)
 
     snapshot = await graph.aget_state(config)
     pending = [t for t in snapshot.tasks if getattr(t, "interrupts", None)]
     if pending:
         return {"status": "needs_confirmation", "payload": pending[0].interrupts[0].value}
-    return {
-        "status": "ok",
-        "reply": result["messages"][-1].content,
-        "evidence": summarize_evidence(result["messages"]),
-    }
+    reply = result["messages"][-1].content
+    evidence = summarize_evidence(result["messages"])
+    await repo.save_coach_message(user_id, body.thread_id, "coach", reply, evidence or None)
+    return {"status": "ok", "reply": reply, "evidence": evidence}
+
+
+@app.get("/coach/threads")
+async def coach_threads(user_id: str = Depends(get_current_user_id)):
+    return {"threads": await _state["repo"].list_coach_threads(user_id)}
+
+
+@app.get("/coach/threads/{thread_id}")
+async def coach_thread_messages(thread_id: str, user_id: str = Depends(get_current_user_id)):
+    return {"messages": await _state["repo"].get_coach_messages(user_id, thread_id)}
 
 
 class ParseWorkoutIn(BaseModel):
@@ -194,7 +205,9 @@ async def confirm(body: ConfirmIn, user_id: str = Depends(get_current_user_id)):
         raise HTTPException(503, "coach unavailable: LLM provider not configured")
     config = _cfg(user_id, body.thread_id)
     result = await graph.ainvoke(Command(resume=body.approved), config=config)
-    return {"status": "ok", "reply": result["messages"][-1].content}
+    reply = result["messages"][-1].content
+    await _state["repo"].save_coach_message(user_id, body.thread_id, "coach", reply)
+    return {"status": "ok", "reply": reply}
 
 
 class ReviewIn(BaseModel):

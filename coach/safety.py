@@ -177,6 +177,29 @@ def _contains(text: str, terms) -> bool:
     return any(term in t for term in terms)
 
 
+# Cues that flip a soft term into a SAFE mention ("you don't need to starve", "avoid crash
+# diets", "without skipping meals"). Used outbound only: the coach legitimately names these
+# things while telling the user NOT to do them — that must not trip the guard.
+_NEGATION_CUES = (
+    "don't", "don’t", "dont", "do not", "won't", "won’t", "wont", "will not", "no need",
+    "not ", "never", "without", "avoid", "shouldn't", "should not", "isn't", "rather than",
+    "instead of", "no reason", "don't have to", "doesn't", "no point", "steer clear", "stay away",
+)
+
+
+def _unsafe_mention(text: str, terms) -> bool:
+    """True only if a term appears WITHOUT a nearby preceding negation — i.e. as advice to do
+    it, not as something to avoid. Prevents reassuring replies from being flagged."""
+    t = text.lower()
+    for term in terms:
+        start = 0
+        while (i := t.find(term, start)) != -1:
+            if not any(neg in t[max(0, i - 40):i] for neg in _NEGATION_CUES):
+                return True
+            start = i + len(term)
+    return False
+
+
 def _is_rapid_loss(text: str) -> bool:
     m = _RAPID_LOSS.search(text)
     if not m:
@@ -232,10 +255,12 @@ def screen_user_message(text: str) -> ScreenResult:
 
 
 def screen_coach_reply(text: str) -> ScreenResult:
-    """Outbound guard: catch unsafe content the model may have produced anyway."""
-    if _contains(text, _DISORDERED_EATING):
+    """Outbound guard: catch unsafe content the model may have produced anyway. Uses
+    negation-aware matching for the soft terms so reassuring replies ('you don't need to
+    starve / crash diet') aren't replaced with a refusal."""
+    if _unsafe_mention(text, _DISORDERED_EATING):
         return ScreenResult(flagged=True, category="disordered_eating")
-    if _is_rapid_loss(text) or _contains(text, _EXTREME_DEFICIT):
+    if _is_rapid_loss(text) or _unsafe_mention(text, _EXTREME_DEFICIT):
         return ScreenResult(flagged=True, category="extreme_deficit")
     if _contains(text, _TRAIN_THROUGH_INJURY):
         return ScreenResult(flagged=True, category="train_through_injury")

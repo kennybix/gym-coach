@@ -178,6 +178,23 @@ export async function coachInsight(refresh = false, focus = "auto"): Promise<Ins
   }
 }
 
+export type CoachThread = { thread_id: string; title: string; updated: string; count: number };
+export async function coachThreads(): Promise<CoachThread[]> {
+  try {
+    return (await apiGet<{ threads: CoachThread[] }>("/coach/threads")).threads;
+  } catch {
+    return [];
+  }
+}
+export type StoredMsg = { role: string; text: string; evidence?: { label: string; detail: string }[] | null };
+export async function coachThreadMessages(threadId: string): Promise<StoredMsg[]> {
+  try {
+    return (await apiGet<{ messages: StoredMsg[] }>(`/coach/threads/${encodeURIComponent(threadId)}`)).messages;
+  } catch {
+    return [];
+  }
+}
+
 export type Review = { status: string; summary: string; changes: Record<string, unknown>; created_at: string } | null;
 
 export async function coachLatestReview(): Promise<Review> {
