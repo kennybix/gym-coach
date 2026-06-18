@@ -403,7 +403,7 @@ function Bubble({ role, text, evidence }: { role: Msg["role"]; text: string; evi
           <div className="flex flex-wrap gap-1.5 px-1">
             <span className="text-dim text-[10px] uppercase tracking-wide self-center">Based on</span>
             {evidence.map((e, i) => (
-              <span key={i} className="chip px-2 py-0.5 text-[11px] text-dim">
+              <span key={i} className="chip px-2 py-0.5 text-[11px] text-dim max-w-full break-words">
                 <span className="text-bone/80">{e.label}</span> {e.detail}
               </span>
             ))}

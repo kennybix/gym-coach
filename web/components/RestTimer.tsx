@@ -44,7 +44,7 @@ export default function RestTimer({
   return (
     <div className="fixed inset-0 z-50 bg-ink/95 backdrop-blur-md flex flex-col items-center justify-center px-6">
       <p className="eyebrow mb-1.5">Rest</p>
-      <p className="text-bone/80 text-sm mb-10">{exercise}</p>
+      <p className="text-bone/80 text-sm mb-10 truncate max-w-[80vw]">{exercise}</p>
 
       <div className="relative w-[min(300px,72vw)]">
         <svg viewBox="0 0 300 300" className="w-full h-auto -rotate-90">

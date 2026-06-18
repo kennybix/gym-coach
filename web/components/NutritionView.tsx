@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiGet, configured } from "@/lib/api";
 import { enqueue } from "@/lib/queue";
+import { localDate } from "@/lib/date";
 import NumField from "./NumField";
 import FoodLog from "./FoodLog";
 
@@ -22,7 +23,7 @@ type Nutrition = {
 };
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return localDate();
 }
 function pretty(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
@@ -70,7 +71,7 @@ export default function NutritionView() {
     for (let i = data.window_days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const iso = d.toISOString().slice(0, 10);
+      const iso = localDate(d);
       days.push({ date: iso, on: logged.has(iso) });
     }
     return days;

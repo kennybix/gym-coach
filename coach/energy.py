@@ -27,7 +27,21 @@ _MET_TABLE: list[tuple[tuple[str, ...], float]] = [
     (("ellipt",), 5.0),
 ]
 _RUN_KEYS = ("treadmill", "running", "jog", "sprint")
+# walking/running on a measured distance: use the ACSM metabolic equations, which factor INCLINE.
+_WALK_RUN_KEYS = ("treadmill", "running", "jog", "sprint", "walk", "hik")
 DEFAULT_MET = 6.0  # unknown cardio/activity
+
+
+def _acsm_kcal(speed_m_per_min: float, grade: float, weight_kg: float, minutes: float) -> float:
+    """ACSM walking/running metabolic equations (VO2 ml/kg/min) — these include treadmill grade,
+    which a flat MET cannot. Running eq applies at ~8 km/h (134 m/min). kcal = VO2 * kg / 1000 *
+    5 kcal/L * minutes."""
+    s = max(0.0, speed_m_per_min)
+    if s >= 134:  # running
+        vo2 = 0.2 * s + 0.9 * s * grade + 3.5
+    else:         # walking
+        vo2 = 0.1 * s + 1.8 * s * grade + 3.5
+    return max(0.0, vo2) * weight_kg / 1000.0 * 5.0 * minutes
 
 
 def _run_met(speed_kmh: float) -> float:
@@ -58,9 +72,17 @@ def met_for(name: str, duration_s: int | None = None, distance_m: int | None = N
 
 
 def estimate_kcal(name: str, duration_s: int | None, distance_m: int | None,
-                  weight_kg: float | None) -> int | None:
-    """kcal for one duration-based entry, or None if it can't be estimated."""
+                  weight_kg: float | None, incline_pct: float | None = None) -> int | None:
+    """kcal for one duration-based entry, or None if it can't be estimated. For walking/running
+    on a measured distance, uses the ACSM equations so treadmill INCLINE counts; otherwise a flat
+    MET. Estimate only."""
     if not duration_s or not weight_kg:
         return None
+    minutes = duration_s / 60.0
+    l = (name or "").lower()
+    if distance_m and any(k in l for k in _WALK_RUN_KEYS):
+        speed_m_per_min = distance_m / minutes
+        grade = max(0.0, float(incline_pct or 0.0)) / 100.0
+        return int(round(_acsm_kcal(speed_m_per_min, grade, float(weight_kg), minutes)))
     kcal = met_for(name, duration_s, distance_m) * float(weight_kg) * (duration_s / 3600.0)
     return int(round(kcal))

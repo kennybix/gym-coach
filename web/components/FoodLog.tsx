@@ -263,8 +263,7 @@ export default function FoodLog({ date, onChange }: { date: string; onChange?: (
           {entries.map((e) => (
             <li key={e.id} className="py-2.5 flex items-center gap-2">
               <span className="flex-1 min-w-0">
-                <span className="text-sm text-bone/90">{e.name}</span>
-                {e.brand && <span className="text-dim text-xs ml-2">{e.brand}</span>}
+                <span className="block truncate text-sm text-bone/90">{e.name}{e.brand && <span className="text-dim text-xs ml-2">{e.brand}</span>}</span>
                 <span className="block text-dim text-xs mt-0.5 tnum">
                   {e.grams ? `${e.grams} g · ` : ""}{e.kcal} kcal · {e.protein_g ?? 0} g protein
                 </span>

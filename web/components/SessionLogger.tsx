@@ -17,10 +17,10 @@ import RestTimer from "./RestTimer";
 
 type LoggedSet = {
   id: string; slotId: string; exerciseId: string;
-  reps?: number; weightKg?: number; durationS?: number; distanceM?: number;
+  reps?: number; weightKg?: number; durationS?: number; distanceM?: number; inclinePct?: number;
   rpe?: number | null; setType?: string | null;
 };
-type LogPayload = { reps?: number; weightKg?: number; durationS?: number; distanceM?: number; rpe?: number | null; setType?: string | null };
+type LogPayload = { reps?: number; weightKg?: number; durationS?: number; distanceM?: number; inclinePct?: number; rpe?: number | null; setType?: string | null };
 type Session = { id: string; startedAt: string; logged: LoggedSet[]; adhoc: ProgramSlot[] };
 
 const SKEY = "active_session_v2";
@@ -137,6 +137,7 @@ export default function SessionLogger() {
           reps: p.reps ?? null, weight_kg: p.weightKg ?? null,
           rpe: p.rpe ?? null, set_type: p.setType ?? null,
           duration_s: p.durationS ?? null, distance_m: p.distanceM ?? null,
+          incline_pct: p.inclinePct ?? null,
           logged_at: new Date().toISOString(),
         }],
       });
@@ -350,7 +351,8 @@ function Panel({ children }: { children: React.ReactNode }) {
 function fmtCardio(s: LoggedSet): string {
   const min = Math.round((s.durationS ?? 0) / 60);
   const km = s.distanceM ? (s.distanceM / 1000).toFixed(1) : null;
-  return `${min} min${km ? ` · ${km} km` : ""}`;
+  const inc = s.inclinePct ? ` · ${s.inclinePct}%` : "";
+  return `${min} min${km ? ` · ${km} km` : ""}${inc}`;
 }
 
 function SlotCard({
@@ -379,6 +381,7 @@ function SlotCard({
   // cardio inputs
   const [durationMin, setDurationMin] = useState(20);
   const [distanceKm, setDistanceKm] = useState(0);
+  const [inclinePct, setInclinePct] = useState(0);
   // inline edit
   const [editingId, setEditingId] = useState<string | null>(null);
   const [eReps, setEReps] = useState(8);
@@ -459,10 +462,10 @@ function SlotCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             {cardio ? (
-              <h2 className="font-display font-semibold leading-tight">{slot.name}</h2>
+              <h2 className="font-display font-semibold leading-tight truncate min-w-0">{slot.name}</h2>
             ) : (
-              <button onClick={() => setShowDetail(true)} className="text-left active:text-volt">
-                <h2 className="font-display font-semibold leading-tight">{slot.name}</h2>
+              <button onClick={() => setShowDetail(true)} className="text-left active:text-volt min-w-0">
+                <h2 className="font-display font-semibold leading-tight truncate">{slot.name}</h2>
               </button>
             )}
             {pr ? (
@@ -545,7 +548,8 @@ function SlotCard({
             <NumField value={durationMin} onChange={setDurationMin} step={1} min={1} max={600} unit="min" />
             <NumField value={distanceKm} onChange={setDistanceKm} step={0.1} min={0} max={300} decimals={1} unit="km" />
           </div>
-          <button onClick={() => onLog(slot, { durationS: Math.round(durationMin * 60), distanceM: Math.round(distanceKm * 1000) })} className="btn btn-primary w-full h-11">
+          <NumField label="Incline" value={inclinePct} onChange={setInclinePct} step={0.5} min={0} max={40} decimals={1} unit="%" />
+          <button onClick={() => onLog(slot, { durationS: Math.round(durationMin * 60), distanceM: Math.round(distanceKm * 1000), inclinePct: inclinePct || undefined })} className="btn btn-primary w-full h-11">
             {loggedCount > 0 ? "Log again" : "Log"}
           </button>
         </div>

@@ -419,13 +419,13 @@ class PostgresCoachRepo:
                     status = await con.execute(
                         """
                         insert into set_logs (id, session_id, user_id, exercise_id,
-                                              reps, weight_kg, rpe, logged_at, duration_s, distance_m, set_type)
-                        values ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11)
+                                              reps, weight_kg, rpe, logged_at, duration_s, distance_m, set_type, incline_pct)
+                        values ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                         on conflict (id) do nothing
                         """,
                         s["id"], session_id, user_id, s["exercise_id"],
                         s.get("reps"), s.get("weight_kg"), s.get("rpe"), s["logged_at"],
-                        s.get("duration_s"), s.get("distance_m"), s.get("set_type"),
+                        s.get("duration_s"), s.get("distance_m"), s.get("set_type"), s.get("incline_pct"),
                     )
                     inserted += int(status.rsplit(" ", 1)[-1])
         return inserted
@@ -477,22 +477,28 @@ class PostgresCoachRepo:
         """Estimated calories burned from duration-based logs (cardio + sports) over the window,
         MET x bodyweight x time. Estimates, not measurements."""
         weight = await self.get_latest_weight_kg(user_id)
+        # Per-SET rows (not summed-per-exercise): kcal is computed on each bout's own speed/incline
+        # then summed — summing duration+distance first would average the speed and distort the
+        # (nonlinear) energy estimate.
         rows = await self._pool.fetch(
-            """select sl.exercise_id, sum(sl.duration_s)::bigint as dur,
-                      sum(sl.distance_m)::bigint as dist, count(*) as n
+            """select sl.exercise_id, sl.duration_s, sl.distance_m, sl.incline_pct
                from set_logs sl join sessions s on s.session_id = sl.session_id
                where sl.user_id = $1::uuid and sl.duration_s is not null
-                 and coalesce(s.completed_at, s.started_at) >= now() - make_interval(days => $2::int)
-               group by sl.exercise_id order by dur desc""",
+                 and coalesce(s.completed_at, s.started_at) >= now() - make_interval(days => $2::int)""",
             user_id, window_days,
         )
-        activities, total = [], 0
+        by_ex: dict = {}
+        total = 0
         for r in rows:
             name = self._catalog.name_of(r["exercise_id"])
-            kcal = energy.estimate_kcal(name, r["dur"], r["dist"], weight)
-            total += kcal or 0
-            activities.append({"name": name, "minutes": round((r["dur"] or 0) / 60),
-                               "sessions": r["n"], "est_kcal": kcal})
+            inc = float(r["incline_pct"]) if r["incline_pct"] is not None else None
+            kcal = energy.estimate_kcal(name, r["duration_s"], r["distance_m"], weight, inc) or 0
+            total += kcal
+            agg = by_ex.setdefault(r["exercise_id"], {"name": name, "minutes": 0, "sessions": 0, "est_kcal": 0})
+            agg["minutes"] += round((r["duration_s"] or 0) / 60)
+            agg["sessions"] += 1
+            agg["est_kcal"] += kcal
+        activities = sorted(by_ex.values(), key=lambda a: -a["minutes"])
         return {"window_days": window_days, "weight_kg_used": round(weight, 1) if weight else None,
                 "total_est_kcal": total, "activities": activities}
 
@@ -531,7 +537,7 @@ class PostgresCoachRepo:
         ids = [s["session_id"] for s in sessions]
         rows = await self._pool.fetch(
             """select id, session_id, exercise_id, reps, weight_kg, rpe, set_type,
-                      duration_s, distance_m, logged_at
+                      duration_s, distance_m, incline_pct, logged_at
                from set_logs where user_id = $1::uuid and session_id = any($2::uuid[])
                order by logged_at""",
             user_id, ids,
@@ -550,7 +556,9 @@ class PostgresCoachRepo:
                 "set_type": r["set_type"],
                 "duration_s": r["duration_s"],
                 "distance_m": r["distance_m"],
-                "est_kcal": energy.estimate_kcal(name, r["duration_s"], r["distance_m"], bw),
+                "incline_pct": float(r["incline_pct"]) if r["incline_pct"] is not None else None,
+                "est_kcal": energy.estimate_kcal(name, r["duration_s"], r["distance_m"], bw,
+                                                 float(r["incline_pct"]) if r["incline_pct"] is not None else None),
                 "logged_at": r["logged_at"].isoformat(),
             })
         out = []

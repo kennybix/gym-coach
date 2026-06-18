@@ -63,6 +63,7 @@ class SetIn(BaseModel):
     set_type: Optional[str] = None     # normal (default) | warmup | drop | failure
     duration_s: Optional[int] = None   # cardio: seconds
     distance_m: Optional[int] = None   # cardio: meters
+    incline_pct: Optional[float] = None  # cardio: treadmill incline %, factors into kcal (ACSM)
     logged_at: datetime
 
 

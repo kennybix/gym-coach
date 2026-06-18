@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiGet, configured } from "@/lib/api";
 import { enqueue } from "@/lib/queue";
+import { localDate } from "@/lib/date";
 import WeightChart, { type WeightPoint } from "./WeightChart";
 import NumField from "./NumField";
 import VitalsCard from "./VitalsCard";
@@ -38,7 +39,7 @@ type Trends = {
 };
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return localDate();
 }
 function pretty(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
