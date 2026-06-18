@@ -118,6 +118,29 @@ async def coach_thread_messages(thread_id: str, user_id: str = Depends(get_curre
     return {"messages": await _state["repo"].get_coach_messages(user_id, thread_id)}
 
 
+class DesignProgramIn(BaseModel):
+    goal: str
+
+
+@app.post("/coach/design-program")
+async def design_program_ep(body: DesignProgramIn, user_id: str = Depends(get_current_user_id)):
+    """Generate a structured weekly program for a free-text goal (e.g. 'kegels', 'better posture').
+    Returns it for the user to review/edit; nothing is written until they install via /api/programs."""
+    model = _state.get("insight_model")
+    if model is None:
+        raise HTTPException(503, "coach unavailable: LLM provider not configured")
+    if not (body.goal or "").strip():
+        raise HTTPException(422, "tell me a goal")
+    repo = _state["repo"]
+    try:
+        p = await repo.get_profile(user_id)
+        psum = f"sex {p.sex}, activity {p.activity_level}"
+    except LookupError:
+        psum = "unknown"
+    from .programs import design_program
+    return await design_program(body.goal.strip(), psum, repo._catalog, model)
+
+
 class ParseWorkoutIn(BaseModel):
     text: str
 

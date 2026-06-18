@@ -712,3 +712,64 @@ async def create_program(body: ProgramIn, user_id: str = Depends(get_current_use
         [e.model_dump() for e in body.exercises],
     )
     return {"status": "ok", "program_id": pid}
+
+
+# ----------------------------- program library -------------------------------
+@router.get("/programs")
+async def programs_list(user_id: str = Depends(get_current_user_id)):
+    return {"programs": await _repo.list_programs(user_id)}
+
+
+@router.get("/programs/templates")
+async def programs_templates(user_id: str = Depends(get_current_user_id)):
+    from .programs import TEMPLATES
+    return {"templates": [{"key": t["key"], "name": t["name"], "goal": t["goal"],
+                           "sessions_per_week": t["sessions_per_week"], "count": len(t["exercises"])}
+                          for t in TEMPLATES]}
+
+
+@router.get("/programs/template/{key}")
+async def programs_template(key: str, user_id: str = Depends(get_current_user_id)):
+    from .programs import template_program
+    p = template_program(key, _repo._catalog)
+    if not p:
+        raise HTTPException(404, "unknown template")
+    return p
+
+
+class ProgramAddIn(BaseModel):
+    name: str
+    goal: Optional[str] = None
+    sessions_per_week: int = Field(ge=1, le=7)
+    exercises: list[dict] = Field(min_length=1)  # {exercise_id, sets?, reps?}
+
+
+@router.post("/programs")
+async def programs_add(body: ProgramAddIn, user_id: str = Depends(get_current_user_id)):
+    exs = [{"exercise_id": e["exercise_id"], "sets": e.get("sets"), "reps": e.get("reps")}
+           for e in body.exercises if e.get("exercise_id")]
+    if not exs:
+        raise HTTPException(422, "a program needs at least one exercise")
+    pid = await _repo.add_program(user_id, body.name, body.sessions_per_week, exs, goal=body.goal)
+    return {"status": "ok", "program_id": pid}
+
+
+class ProgramActiveIn(BaseModel):
+    program_id: str
+    active: bool
+
+
+@router.post("/programs/active")
+async def programs_active(body: ProgramActiveIn, user_id: str = Depends(get_current_user_id)):
+    await _repo.set_program_active(user_id, body.program_id, body.active)
+    return {"status": "ok"}
+
+
+class ProgramDeleteIn(BaseModel):
+    program_id: str
+
+
+@router.post("/programs/delete")
+async def programs_delete(body: ProgramDeleteIn, user_id: str = Depends(get_current_user_id)):
+    await _repo.delete_program(user_id, body.program_id)
+    return {"status": "ok"}

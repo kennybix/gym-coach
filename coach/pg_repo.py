@@ -319,11 +319,12 @@ class PostgresCoachRepo:
         rows = await self._pool.fetch(
             """
             select pe.program_exercise_id, pe.exercise_id, pe.position,
-                   pe.sets, pe.reps, pe.load_kg
+                   pe.sets, pe.reps, pe.load_kg,
+                   p.program_id, p.name as program_name
             from program_exercises pe
             join programs p on p.program_id = pe.program_id
             where p.user_id = $1::uuid and p.is_active
-            order by pe.position
+            order by p.created_at, pe.position
             """,
             user_id,
         )
@@ -356,6 +357,8 @@ class PostgresCoachRepo:
                 "load_kg": float(r["load_kg"]) if r["load_kg"] is not None else None,
                 "suggested_kg": sug_kg,
                 "suggested_reason": sug_reason,
+                "program_id": str(r["program_id"]),
+                "program_name": r["program_name"],
                 **detail,
             })
         return out
@@ -1128,6 +1131,53 @@ class PostgresCoachRepo:
                         pid, e["exercise_id"], i, e["sets"], e["reps"],
                     )
         return str(pid)
+
+    # --- program library (multiple programs, each independently active) ------
+    async def add_program(self, user_id: str, name: str, sessions_per_week: int,
+                          exercises: list[dict], goal: str | None = None, activate: bool = True) -> str:
+        """Add a program to the library WITHOUT deactivating the others (so a user can run e.g.
+        a lifting program and a daily kegels routine together). Custom (non-catalog) exercise_ids
+        are fine — they resolve to their own name."""
+        async with self._pool.acquire() as con:
+            async with con.transaction():
+                pid = await con.fetchval(
+                    """insert into programs (user_id, name, sessions_per_week, is_active, goal)
+                       values ($1::uuid, $2, $3, $4, $5) returning program_id""",
+                    user_id, name, sessions_per_week, activate, goal,
+                )
+                for i, e in enumerate(exercises):
+                    await con.execute(
+                        """insert into program_exercises (program_id, exercise_id, position, sets, reps)
+                           values ($1, $2, $3, $4, $5)""",
+                        pid, e["exercise_id"], i, e.get("sets"), e.get("reps"),
+                    )
+        return str(pid)
+
+    async def list_programs(self, user_id: str) -> list[dict]:
+        rows = await self._pool.fetch(
+            """select p.program_id, p.name, p.goal, p.sessions_per_week, p.is_active,
+                      count(pe.program_exercise_id) as n
+               from programs p
+               left join program_exercises pe on pe.program_id = p.program_id
+               where p.user_id = $1::uuid
+               group by p.program_id order by p.is_active desc, p.created_at desc""",
+            user_id,
+        )
+        return [{"program_id": str(r["program_id"]), "name": r["name"], "goal": r["goal"],
+                 "sessions_per_week": r["sessions_per_week"], "is_active": r["is_active"],
+                 "exercises": int(r["n"])} for r in rows]
+
+    async def set_program_active(self, user_id: str, program_id: str, active: bool) -> None:
+        await self._pool.execute(
+            "update programs set is_active = $3 where program_id = $1::uuid and user_id = $2::uuid",
+            program_id, user_id, active,
+        )
+
+    async def delete_program(self, user_id: str, program_id: str) -> None:
+        await self._pool.execute(
+            "delete from programs where program_id = $1::uuid and user_id = $2::uuid",
+            program_id, user_id,
+        )
 
     async def get_active_program_meta(self, user_id: str) -> Optional[dict]:
         """Name + cadence of the active program, so an editor can preserve them on save."""
