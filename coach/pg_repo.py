@@ -179,7 +179,7 @@ class PostgresCoachRepo:
                    avg(protein_g)            as avg_protein
             from nutrition_logs
             where user_id = $1::uuid
-              and logged_on >= (now() - make_interval(days => $2::int))::date
+              and logged_on >= current_date - ($2::int - 1)
             """,
             user_id,
             window_days,
@@ -479,11 +479,12 @@ class PostgresCoachRepo:
         weight = await self.get_latest_weight_kg(user_id)
         # Per-SET rows (not summed-per-exercise): kcal is computed on each bout's own speed/incline
         # then summed — summing duration+distance first would average the speed and distort the
-        # (nonlinear) energy estimate.
+        # (nonlinear) energy estimate. Strength sets (no duration) get a modest resistance estimate
+        # so a mixed workout's total isn't just the cardio.
         rows = await self._pool.fetch(
-            """select sl.exercise_id, sl.duration_s, sl.distance_m, sl.incline_pct
+            """select sl.exercise_id, sl.duration_s, sl.distance_m, sl.incline_pct, sl.reps
                from set_logs sl join sessions s on s.session_id = sl.session_id
-               where sl.user_id = $1::uuid and sl.duration_s is not null
+               where sl.user_id = $1::uuid
                  and coalesce(s.completed_at, s.started_at) >= now() - make_interval(days => $2::int)""",
             user_id, window_days,
         )
@@ -491,14 +492,17 @@ class PostgresCoachRepo:
         total = 0
         for r in rows:
             name = self._catalog.name_of(r["exercise_id"])
-            inc = float(r["incline_pct"]) if r["incline_pct"] is not None else None
-            kcal = energy.estimate_kcal(name, r["duration_s"], r["distance_m"], weight, inc) or 0
+            if r["duration_s"]:
+                inc = float(r["incline_pct"]) if r["incline_pct"] is not None else None
+                kcal = energy.estimate_kcal(name, r["duration_s"], r["distance_m"], weight, inc) or 0
+            else:
+                kcal = energy.strength_kcal(weight, 1) or 0
             total += kcal
             agg = by_ex.setdefault(r["exercise_id"], {"name": name, "minutes": 0, "sessions": 0, "est_kcal": 0})
             agg["minutes"] += round((r["duration_s"] or 0) / 60)
             agg["sessions"] += 1
             agg["est_kcal"] += kcal
-        activities = sorted(by_ex.values(), key=lambda a: -a["minutes"])
+        activities = sorted(by_ex.values(), key=lambda a: -a["est_kcal"])
         return {"window_days": window_days, "weight_kg_used": round(weight, 1) if weight else None,
                 "total_est_kcal": total, "activities": activities}
 
@@ -557,8 +561,9 @@ class PostgresCoachRepo:
                 "duration_s": r["duration_s"],
                 "distance_m": r["distance_m"],
                 "incline_pct": float(r["incline_pct"]) if r["incline_pct"] is not None else None,
-                "est_kcal": energy.estimate_kcal(name, r["duration_s"], r["distance_m"], bw,
-                                                 float(r["incline_pct"]) if r["incline_pct"] is not None else None),
+                "est_kcal": (energy.estimate_kcal(name, r["duration_s"], r["distance_m"], bw,
+                                                  float(r["incline_pct"]) if r["incline_pct"] is not None else None)
+                             if r["duration_s"] else energy.strength_kcal(bw, 1)),
                 "logged_at": r["logged_at"].isoformat(),
             })
         out = []

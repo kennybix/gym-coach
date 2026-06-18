@@ -44,6 +44,17 @@ def _acsm_kcal(speed_m_per_min: float, grade: float, weight_kg: float, minutes: 
     return max(0.0, vo2) * weight_kg / 1000.0 * 5.0 * minutes
 
 
+RESISTANCE_MET = 5.0  # resistance training, moderate-vigorous (Compendium ~3.5 moderate / 6.0 vigorous)
+
+
+def strength_kcal(weight_kg: float | None, sets: int = 1) -> int | None:
+    """Rough kcal for resistance work — ~1.5 min of effort-equivalent per set at a resistance MET,
+    so a strength session isn't counted as zero. Estimate only; strength burn is modest and noisy."""
+    if not weight_kg or not sets:
+        return None
+    return int(round(RESISTANCE_MET * float(weight_kg) * (1.5 / 60.0) * sets))
+
+
 def _run_met(speed_kmh: float) -> float:
     if speed_kmh < 5.0:
         return 3.5      # walking pace

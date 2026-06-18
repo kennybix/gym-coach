@@ -135,7 +135,10 @@ async def parse_workout_ep(body: ParseWorkoutIn, user_id: str = Depends(get_curr
     weight = await _state["repo"].get_latest_weight_kg(user_id)
     for e in result.get("entries", []):
         ex = e.get("exercise") or {}
-        e["est_kcal"] = energy.estimate_kcal(ex.get("name", ""), e.get("duration_s"), e.get("distance_m"), weight)
+        if e.get("duration_s"):
+            e["est_kcal"] = energy.estimate_kcal(ex.get("name", ""), e.get("duration_s"), e.get("distance_m"), weight)
+        else:
+            e["est_kcal"] = energy.strength_kcal(weight, e.get("sets") or 1)
     return result
 
 
