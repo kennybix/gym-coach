@@ -51,6 +51,8 @@ export type ProgramSlot = {
   image_urls: string[];
   cues: string[];
   position: number;
+  program_id?: string;
+  program_name?: string;
 };
 
 export type ExerciseStats = {
@@ -133,6 +135,29 @@ export async function parseFoodPhoto(
   if (!res.ok) throw new Error(`parse-food-photo -> ${res.status}`);
   return res.json();
 }
+
+/* ---- program library ---- */
+export type ProgramSummary = { program_id: string; name: string; goal: string | null; sessions_per_week: number; is_active: boolean; exercises: number };
+export type TemplateSummary = { key: string; name: string; goal: string; sessions_per_week: number; count: number };
+export type DesignedExercise = { exercise_id: string; name: string; sets: number; reps: number };
+export type DesignedProgram = { name: string; goal: string | null; sessions_per_week: number; exercises: DesignedExercise[]; note: string | null };
+
+export const listPrograms = () => apiGet<{ programs: ProgramSummary[] }>("/api/programs").then((r) => r.programs);
+export const listTemplates = () => apiGet<{ templates: TemplateSummary[] }>("/api/programs/templates").then((r) => r.templates);
+export const getTemplate = (key: string) => apiGet<DesignedProgram>(`/api/programs/template/${encodeURIComponent(key)}`);
+export async function designProgram(goal: string): Promise<DesignedProgram | { unavailable: true }> {
+  const res = await fetch(`${apiBase()}/coach/design-program`, {
+    method: "POST", headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ goal }),
+  });
+  if (res.status === 503) return { unavailable: true };
+  if (!res.ok) throw new Error(`design-program -> ${res.status}`);
+  return res.json();
+}
+export const addProgram = (p: { name: string; goal: string | null; sessions_per_week: number; exercises: { exercise_id: string; sets: number; reps: number }[] }) =>
+  apiPost("/api/programs", p);
+export const setProgramActive = (program_id: string, active: boolean) => apiPost("/api/programs/active", { program_id, active });
+export const deleteProgram = (program_id: string) => apiPost("/api/programs/delete", { program_id });
 
 /* ---- coach endpoints (separate from /api; may be 503 if no LLM configured) ---- */
 export type Evidence = { label: string; detail: string };

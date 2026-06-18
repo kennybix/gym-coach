@@ -245,19 +245,30 @@ export default function SessionLogger() {
         </Panel>
       ) : (
         <div className="space-y-4">
-          {allSlots.map((slot, i) => (
-            <SlotCard
-              key={slot.program_exercise_id}
-              slot={slot}
-              index={i}
-              active={Boolean(session)}
-              loggedSets={session ? session.logged.filter((l) => l.slotId === slot.program_exercise_id) : []}
-              flash={flash === slot.program_exercise_id}
-              onLog={logSet}
-              onRemoveSet={removeSet}
-              onEditSet={editSet}
-            />
-          ))}
+          {(() => {
+            // group by program when more than one is active, so parallel routines read clearly
+            const showHeaders = new Set(allSlots.map((s) => s.program_name).filter(Boolean)).size > 1;
+            let lastProg: string | undefined;
+            return allSlots.map((slot, i) => {
+              const header = showHeaders && slot.program_name && slot.program_name !== lastProg ? slot.program_name : null;
+              lastProg = slot.program_name ?? lastProg;
+              return (
+                <div key={slot.program_exercise_id} className="space-y-4">
+                  {header && <p className="eyebrow px-1 pt-1">{header}</p>}
+                  <SlotCard
+                    slot={slot}
+                    index={i}
+                    active={Boolean(session)}
+                    loggedSets={session ? session.logged.filter((l) => l.slotId === slot.program_exercise_id) : []}
+                    flash={flash === slot.program_exercise_id}
+                    onLog={logSet}
+                    onRemoveSet={removeSet}
+                    onEditSet={editSet}
+                  />
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
 
