@@ -131,23 +131,21 @@ class PostgresCoachRepo:
     # --- adherence (prescribed vs actual) ------------------------------------
     async def get_adherence(self, user_id: str, window_days: int) -> AdherenceSummary:
         weeks = window_days / 7.0
-        prog = await self._pool.fetchrow(
+        # Aggregate across ALL active programs (a user can run several in parallel), summing each
+        # program's own sessions/week × its set count — not just the most recent one.
+        progs = await self._pool.fetch(
             """
             select p.sessions_per_week,
                    coalesce(sum(pe.sets), 0) as sets_per_session
             from programs p
             left join program_exercises pe on pe.program_id = p.program_id
             where p.user_id = $1::uuid and p.is_active
-            group by p.program_id, p.sessions_per_week, p.created_at
-            order by p.created_at desc
-            limit 1
+            group by p.program_id, p.sessions_per_week
             """,
             user_id,
         )
-        spw = prog["sessions_per_week"] if prog else 0
-        sets_per_session = int(prog["sets_per_session"]) if prog else 0
-        sessions_prescribed = round(spw * weeks)
-        sets_prescribed = sets_per_session * sessions_prescribed
+        sessions_prescribed = round(sum(p["sessions_per_week"] for p in progs) * weeks)
+        sets_prescribed = round(sum(p["sessions_per_week"] * int(p["sets_per_session"]) for p in progs) * weeks)
 
         counts = await self._pool.fetchrow(
             """

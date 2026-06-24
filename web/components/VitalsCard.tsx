@@ -60,9 +60,9 @@ export default function VitalsCard({ delay = 0 }: { delay?: number }) {
   }, []);
   useEffect(load, [load]);
 
-  const save = useCallback(() => {
+  const save = useCallback(async () => {
     if (!logBP && !logHR) return;
-    void enqueue("/api/vitals", {
+    const v: Vital = {
       id: crypto.randomUUID(),
       recorded_at: new Date().toISOString(),
       systolic: logBP ? sys : null,
@@ -70,11 +70,13 @@ export default function VitalsCard({ delay = 0 }: { delay?: number }) {
       heart_rate: logHR ? hr : null,
       tag: tag || null,
       note: note.trim() || null,
-    });
+    };
+    setList((p) => [v, ...p]); // optimistic — show it immediately
     setNote("");
     setSavedTick(true);
     setTimeout(() => setSavedTick(false), 1400);
-    setTimeout(load, 400);
+    await enqueue("/api/vitals", v);
+    load(); // reconcile with the server (after the write has had its flush)
   }, [logBP, logHR, sys, dia, hr, tag, note, load]);
 
   const remove = useCallback((id: string) => {

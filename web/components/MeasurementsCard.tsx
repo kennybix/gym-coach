@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiGet, apiPost, configured } from "@/lib/api";
 import { enqueue } from "@/lib/queue";
+import { localDate } from "@/lib/date";
 import NumField from "./NumField";
 import BodyMap from "./BodyMap";
 import { navyBodyFat, waistToHeight } from "@/lib/bodyfat";
@@ -51,14 +52,22 @@ export default function MeasurementsCard({ delay = 0 }: { delay?: number }) {
   }, []);
   useEffect(load, [load]);
 
-  const save = () => {
+  const save = async () => {
     const body: Record<string, number> = {};
     for (const s of SITES) { const n = vals[s.key]; if (n && n > 0) body[s.key] = n; }
     if (Object.keys(body).length === 0) return;
-    void enqueue("/api/measurements", body);
+    // optimistic: show today's entry immediately
+    const today = localDate();
+    const optimistic: Measurement = {
+      date: today, note: null, waist_cm: null, belly_cm: null, chest_cm: null, hips_cm: null,
+      arm_cm: null, thigh_cm: null, neck_cm: null, body_fat_pct: null,
+    };
+    for (const s of SITES) { const n = vals[s.key]; if (n && n > 0) (optimistic as Record<string, unknown>)[s.key] = n; }
+    setList((xs) => [optimistic, ...xs.filter((m) => m.date !== today)]);
     setSavedTick(true);
     setTimeout(() => setSavedTick(false), 1400);
-    setTimeout(load, 400);
+    await enqueue("/api/measurements", body);
+    load();
   };
 
   const remove = async (date: string) => {

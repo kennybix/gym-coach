@@ -57,11 +57,13 @@ export default function NutritionView() {
     if (row?.protein_g != null) setProtein(Math.round(row.protein_g));
   }, [selected, data]);
 
-  const save = useCallback(() => {
-    void enqueue("/api/nutrition", { logged_on: selected, kcal, protein_g: protein });
+  const save = useCallback(async () => {
+    // optimistic: reflect the day's total immediately
+    setData((d) => (d ? { ...d, series: d.series.map((s) => (s.date === selected ? { ...s, kcal, protein_g: protein } : s)) } : d));
     setSavedTick(true);
     setTimeout(() => setSavedTick(false), 1400);
-    setTimeout(load, 400);
+    await enqueue("/api/nutrition", { logged_on: selected, kcal, protein_g: protein });
+    load();
   }, [kcal, protein, selected, load]);
 
   const strip = useMemo(() => {

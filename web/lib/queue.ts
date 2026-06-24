@@ -46,7 +46,9 @@ async function withStore<T>(
 export async function enqueue(path: string, body: unknown): Promise<void> {
   const item: QueueItem = { id: crypto.randomUUID(), ts: Date.now(), path, body };
   await withStore("readwrite", (s) => s.add(item));
-  void flush(); // fire-and-forget; offline it just stays queued
+  // Await the flush so callers that `await enqueue(...)` can reload AFTER the write lands (when
+  // online). `void enqueue(...)` callers are unaffected (offline it just stays queued).
+  await flush();
 }
 
 export async function pendingCount(): Promise<number> {
