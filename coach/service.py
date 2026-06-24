@@ -223,6 +223,48 @@ async def photo_note_ep(body: PhotoNoteIn, user_id: str = Depends(get_current_us
     return {"note": note, "disabled": False}
 
 
+_COMPARE_PROMPT = (
+    "Compare two progress photos of the same person — A is the earlier one, B is more recent. In "
+    "2-4 sentences, note visible changes between them in conditioning, posture, and muscle tone, "
+    "constructively and factually, and end with one thing to keep doing. Be encouraging and "
+    "non-judgmental: never shame, never comment on weight as a number, never use clinical or "
+    "appearance-shaming language, and don't give medical advice. If the photos are too different "
+    "in angle/lighting to compare fairly, say so kindly and suggest matching the setup next time."
+)
+
+
+class PhotoCompareIn(BaseModel):
+    a: str  # earlier photo id
+    b: str  # later photo id
+
+
+@app.post("/coach/compare-photos")
+async def compare_photos_ep(body: PhotoCompareIn, user_id: str = Depends(get_current_user_id)):
+    """Vision comparison of two progress photos (before/after). Disabled for eating-disorder
+    history, like single-photo feedback."""
+    model = _state.get("insight_model")
+    if model is None:
+        raise HTTPException(503, "coach unavailable: LLM provider not configured")
+    repo = _state["repo"]
+    profile = await repo.get_profile(user_id)
+    if profile and "eating_disorder_history" in profile.medical_flags:
+        return {"note": None, "disabled": True}
+    pa = await repo.get_photo(user_id, body.a)
+    pb = await repo.get_photo(user_id, body.b)
+    if not pa or not pb:
+        raise HTTPException(404, "photo not found")
+    msg = HumanMessage(content=[
+        {"type": "text", "text": _COMPARE_PROMPT},
+        {"type": "text", "text": "Photo A (earlier):"},
+        {"type": "image_url", "image_url": {"url": media.read_data_url(user_id, pa["filename"])}},
+        {"type": "text", "text": "Photo B (more recent):"},
+        {"type": "image_url", "image_url": {"url": media.read_data_url(user_id, pb["filename"])}},
+    ])
+    resp = await model.ainvoke([msg])
+    note = (resp.content if isinstance(resp.content, str) else str(resp.content)).strip()[:1000]
+    return {"note": note, "disabled": False}
+
+
 class ConfirmIn(BaseModel):
     thread_id: str
     approved: bool

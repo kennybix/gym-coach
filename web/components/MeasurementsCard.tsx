@@ -75,10 +75,9 @@ export default function MeasurementsCard({ delay = 0 }: { delay?: number }) {
     await apiPost("/api/measurements/delete", { recorded_on: date });
   };
 
-  const change = (key: keyof Measurement): number | null => {
-    const pts = [...list].reverse().map((m) => m[key] as number | null).filter((x): x is number => x != null);
-    return pts.length >= 2 ? +(pts[pts.length - 1] - pts[0]).toFixed(1) : null;
-  };
+  // chronological (oldest -> newest) non-null values for a site
+  const seriesFor = (key: keyof Measurement): number[] =>
+    [...list].reverse().map((m) => m[key] as number | null).filter((x): x is number => x != null);
 
   const estBf = navyBodyFat({
     sex: profile?.sex ?? null, height: profile?.height_cm ?? null,
@@ -169,11 +168,42 @@ export default function MeasurementsCard({ delay = 0 }: { delay?: number }) {
         </ul>
       )}
 
-      {change("waist_cm") != null && (
-        <p className="text-dim text-xs mt-2">
-          Waist {change("waist_cm")! <= 0 ? "down" : "up"} {Math.abs(change("waist_cm")!)} cm over the last {list.length} entries.
-        </p>
+      {SITES.some((s) => seriesFor(s.key).length >= 2) && (
+        <div className="mt-4">
+          <p className="eyebrow mb-2">Trends</p>
+          <div className="space-y-2">
+            {SITES.filter((s) => seriesFor(s.key).length >= 2).map((s) => {
+              const v = seriesFor(s.key);
+              const ch = +(v[v.length - 1] - v[0]).toFixed(1);
+              return (
+                <div key={s.key as string} className="flex items-center gap-3">
+                  <span className="text-dim text-xs w-14 shrink-0 truncate">{s.label}</span>
+                  <MiniSpark values={v} />
+                  <span className="tnum text-bone/90 text-sm ml-auto">{v[v.length - 1]}{s.unit === "%" ? "%" : ""}</span>
+                  <span className={`tnum text-xs shrink-0 w-11 text-right ${ch === 0 ? "text-dim" : ch < 0 ? "text-volt" : "text-alert"}`}>
+                    {ch > 0 ? "+" : ""}{ch}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
+  );
+}
+
+function MiniSpark({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const w = 70, h = 20, pad = 2;
+  const lo = Math.min(...values), hi = Math.max(...values), span = hi - lo || 1;
+  const x = (i: number) => pad + (i / (values.length - 1)) * (w - 2 * pad);
+  const y = (val: number) => pad + (1 - (val - lo) / span) * (h - 2 * pad);
+  const d = values.map((val, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(val).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="shrink-0">
+      <path d={d} fill="none" stroke="var(--color-volt)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={x(values.length - 1)} cy={y(values[values.length - 1])} r="1.8" fill="var(--color-volt)" />
+    </svg>
   );
 }
