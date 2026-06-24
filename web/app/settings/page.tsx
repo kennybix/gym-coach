@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ExportData from "@/components/ExportData";
 import ProfileEditor from "@/components/ProfileEditor";
 import QueueStatus from "@/components/QueueStatus";
+import RemindersCard from "@/components/RemindersCard";
 import { isNative, syncHealthConnect } from "@/lib/health";
 
 export default function SettingsPage() {
@@ -50,6 +51,8 @@ export default function SettingsPage() {
       <QueueStatus />
 
       <ProfileEditor />
+
+      <RemindersCard />
 
       <Link href="/programs" className="card p-4 rise flex items-center justify-between active:bg-panel2">
         <span>
