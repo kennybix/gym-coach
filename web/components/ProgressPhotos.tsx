@@ -5,18 +5,9 @@
    because <img src> can't send the bearer token. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiBase, apiGet, apiPost, configured, token } from "@/lib/api";
+import { captureNativePhoto, downscaleFile, isNative } from "@/lib/photo";
 
 type Photo = { id: string; date: string; pose: string | null; caption: string | null; coach_note: string | null };
-
-async function downscale(file: File, max = 1280, quality = 0.72): Promise<string> {
-  const bmp = await createImageBitmap(file);
-  const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
-  const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
-  const c = document.createElement("canvas"); c.width = w; c.height = h;
-  c.getContext("2d")!.drawImage(bmp, 0, 0, w, h);
-  bmp.close?.();
-  return c.toDataURL("image/jpeg", quality);
-}
 
 function AuthImg({ id, className, alt }: { id: string; className?: string; alt: string }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -37,6 +28,7 @@ export default function ProgressPhotos({ delay = 0 }: { delay?: number }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const [open, setOpen] = useState<Photo | null>(null);
   const [noteBusy, setNoteBusy] = useState(false);
   const [noteMsg, setNoteMsg] = useState<string | null>(null);
@@ -47,15 +39,37 @@ export default function ProgressPhotos({ delay = 0 }: { delay?: number }) {
   }, []);
   useEffect(load, [load]);
 
-  const onFile = async (file: File | undefined) => {
-    if (!file) return;
-    setBusy(true);
+  const upload = async (image: string) => {
+    setBusy(true); setErr(null);
     try {
-      const image = await downscale(file);
       await apiPost("/api/photos", { image });
       load();
-    } catch { /* ignore */ }
+    } catch {
+      setErr("Couldn't save that photo — check Tailscale is on, then try again.");
+    }
     setBusy(false);
+  };
+
+  // native: Camera plugin (camera OR gallery). web: file input.
+  const addPhoto = async () => {
+    if (isNative()) {
+      setErr(null);
+      const dataUrl = await captureNativePhoto();
+      if (dataUrl) await upload(dataUrl);
+      return;
+    }
+    fileRef.current?.click();
+  };
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true); setErr(null);
+    try {
+      await upload(await downscaleFile(file));
+    } catch {
+      setErr("Couldn't read that image. Try another.");
+      setBusy(false);
+    }
   };
 
   const remove = async (p: Photo) => {
@@ -78,14 +92,16 @@ export default function ProgressPhotos({ delay = 0 }: { delay?: number }) {
     <div className="card p-5 rise" style={{ animationDelay: `${delay}ms` }}>
       <div className="flex items-center justify-between mb-3.5">
         <p className="eyebrow">Progress photos</p>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-        <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn btn-primary h-9 px-4 text-sm">
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+        <button onClick={addPhoto} disabled={busy} className="btn btn-primary h-9 px-4 text-sm">
           {busy ? "Adding…" : "+ Photo"}
         </button>
       </div>
 
+      {err && <p className="text-alert text-xs mb-3">{err}</p>}
+
       {photos.length === 0 ? (
-        <p className="text-dim text-xs leading-relaxed">Add a photo now and again to see your progress over time. They stay private on your own machine.</p>
+        <p className="text-dim text-xs leading-relaxed">Add a photo (camera or gallery) now and again to see your progress over time. They stay private on your own machine.</p>
       ) : (
         <div className="grid grid-cols-3 gap-2">
           {photos.map((p) => (
@@ -110,7 +126,7 @@ export default function ProgressPhotos({ delay = 0 }: { delay?: number }) {
             {noteMsg && <p className="text-sm text-bone/85 leading-relaxed mt-3">{noteMsg}</p>}
             <div className="flex gap-2.5 mt-4">
               <button onClick={() => getNote(open)} disabled={noteBusy} className="btn btn-primary flex-1 h-11">
-                {noteBusy ? "Looking…" : open.coach_note || noteMsg ? "Refresh coach note" : "Get coach note"}
+                {noteBusy ? "Analyzing…" : open.coach_note || noteMsg ? "Re-analyze" : "Analyze & recommend"}
               </button>
               <button onClick={() => remove(open)} className="btn btn-ghost h-11 px-4 text-alert">Delete</button>
             </div>
