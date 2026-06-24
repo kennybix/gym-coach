@@ -996,6 +996,16 @@ class PostgresCoachRepo:
             photo_id, user_id, note,
         )
 
+    async def update_photo(self, user_id: str, photo_id: str, taken_on=None, caption=None) -> None:
+        """Backdate a photo (taken_on) and/or set its caption — each None = leave unchanged."""
+        await self._pool.execute(
+            """update progress_photos set
+                 taken_on = coalesce($3, taken_on),
+                 caption  = coalesce($4, caption)
+               where id = $1::uuid and user_id = $2::uuid""",
+            photo_id, user_id, taken_on, caption,
+        )
+
     async def delete_photo(self, user_id: str, photo_id: str) -> Optional[str]:
         """Delete the row and return its filename so the caller can remove the file."""
         r = await self._pool.fetchrow(

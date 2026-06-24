@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiBase, apiGet, apiPost, configured, token } from "@/lib/api";
 import { captureNativePhoto, downscaleFile, isNative } from "@/lib/photo";
+import { localDate } from "@/lib/date";
 
 type Photo = { id: string; date: string; pose: string | null; caption: string | null; coach_note: string | null };
 
@@ -29,6 +30,7 @@ export default function ProgressPhotos({ delay = 0 }: { delay?: number }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [photoDate, setPhotoDate] = useState(localDate());
   const [open, setOpen] = useState<Photo | null>(null);
   const [noteBusy, setNoteBusy] = useState(false);
   const [noteMsg, setNoteMsg] = useState<string | null>(null);
@@ -42,12 +44,19 @@ export default function ProgressPhotos({ delay = 0 }: { delay?: number }) {
   const upload = async (image: string) => {
     setBusy(true); setErr(null);
     try {
-      await apiPost("/api/photos", { image });
+      await apiPost("/api/photos", { image, taken_on: photoDate });
       load();
     } catch {
       setErr("Couldn't save that photo — check Tailscale is on, then try again.");
     }
     setBusy(false);
+  };
+
+  const setDate = async (p: Photo, date: string) => {
+    setPhotos((xs) => xs.map((x) => (x.id === p.id ? { ...x, date } : x)));
+    setOpen((o) => (o && o.id === p.id ? { ...o, date } : o));
+    await apiPost("/api/photos/update", { id: p.id, taken_on: date });
+    setTimeout(load, 300);
   };
 
   // native: Camera plugin (camera OR gallery). web: file input.
@@ -90,13 +99,18 @@ export default function ProgressPhotos({ delay = 0 }: { delay?: number }) {
 
   return (
     <div className="card p-5 rise" style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex items-center justify-between mb-3.5">
+      <div className="flex items-center justify-between gap-2 mb-2">
         <p className="eyebrow">Progress photos</p>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-        <button onClick={addPhoto} disabled={busy} className="btn btn-primary h-9 px-4 text-sm">
-          {busy ? "Adding…" : "+ Photo"}
-        </button>
+        <div className="flex items-center gap-2 min-w-0">
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+          <input type="date" value={photoDate} max={localDate()} onChange={(e) => setPhotoDate(e.target.value)}
+            className="field h-9 px-2 text-xs tnum outline-none min-w-0" title="Date this photo was taken" />
+          <button onClick={addPhoto} disabled={busy} className="btn btn-primary h-9 px-3.5 text-sm shrink-0">
+            {busy ? "Adding…" : "+ Photo"}
+          </button>
+        </div>
       </div>
+      <p className="text-dim text-[11px] mb-3">Adding an older photo? Set the date first so it lands on the right day.</p>
 
       {err && <p className="text-alert text-xs mb-3">{err}</p>}
 
@@ -118,9 +132,13 @@ export default function ProgressPhotos({ delay = 0 }: { delay?: number }) {
       {open && (
         <div className="fixed inset-0 z-50 bg-ink/80 backdrop-blur-sm flex items-end" onClick={() => setOpen(null)}>
           <div className="w-full max-w-md mx-auto card rounded-b-none p-5 max-h-[90dvh] overflow-auto scroll-soft" style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="eyebrow">{new Date(open.date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "long", day: "numeric" })}</p>
-              <button onClick={() => setOpen(null)} className="text-dim px-1.5 text-xl leading-none">×</button>
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-dim text-xs shrink-0">Taken</span>
+                <input type="date" value={open.date} max={localDate()} onChange={(e) => setDate(open, e.target.value)}
+                  className="field h-9 px-2 text-sm tnum outline-none min-w-0" />
+              </div>
+              <button onClick={() => setOpen(null)} className="text-dim px-1.5 text-xl leading-none shrink-0">×</button>
             </div>
             <AuthImg id={open.id} alt={`progress ${open.date}`} className="w-full max-h-[55dvh] object-contain rounded-xl bg-panel2 border border-line" />
             {noteMsg && <p className="text-sm text-bone/85 leading-relaxed mt-3">{noteMsg}</p>}

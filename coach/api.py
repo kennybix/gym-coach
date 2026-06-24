@@ -578,6 +578,20 @@ async def photo_delete(body: PhotoDeleteIn, user_id: str = Depends(get_current_u
     return {"status": "ok"}
 
 
+class PhotoUpdateIn(BaseModel):
+    id: str
+    taken_on: Optional[str] = None  # ISO date to backdate the photo to when it was taken
+    caption: Optional[str] = None
+
+
+@router.post("/photos/update")
+async def photo_update(body: PhotoUpdateIn, user_id: str = Depends(get_current_user_id)):
+    from datetime import date
+    day = date.fromisoformat(body.taken_on) if body.taken_on else None
+    await _repo.update_photo(user_id, body.id, taken_on=day, caption=body.caption)
+    return {"status": "ok"}
+
+
 class NutritionIn(BaseModel):
     logged_on: Optional[str] = None  # ISO date; defaults to today
     kcal: Optional[int] = None
