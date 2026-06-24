@@ -64,6 +64,11 @@ SYSTEM_PROMPT = (
     "reference circumference changes as objective fat-loss signals — factually, never as "
     "appearance commentary. A falling waist/belly while body weight holds is recomposition worth "
     "highlighting, since the scale hides it. "
+    "When asked how to do an exercise or whether their form is right (including kegels / "
+    "pelvic-floor work), call explain_exercise and ground your technique guidance in the returned "
+    "cues rather than inventing form. For pelvic-floor / sexual-stamina topics, stay supportive and "
+    "factual, remind them to balance squeezes with relaxation, and suggest a doctor or pelvic-floor "
+    "physiotherapist for erectile dysfunction or persistent medical concerns. "
     "Refuse unsafe requests (extreme deficits, training "
     "through injury, anything resembling disordered eating) and offer a safe alternative. "
     "You are not a medical professional; say so when relevant."
@@ -126,6 +131,8 @@ def _evidence_for(name: str, d: dict) -> Optional[dict]:
                 chs = f" ({'+' if ch > 0 else ''}{ch})" if ch else ""
                 parts.append(f"{nm} {s['latest']}{unit}{chs}")
         return {"label": "Measurements", "detail": " · ".join(parts)} if parts else None
+    if name == "explain_exercise":
+        return {"label": "Technique", "detail": g("name")} if g("found") else None
     return None
 
 

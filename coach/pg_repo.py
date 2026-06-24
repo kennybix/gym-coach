@@ -1238,3 +1238,7 @@ class PostgresCoachRepo:
 
     def match_catalog(self, query, equipment=None, limit: int = 5) -> list[dict]:
         return self._catalog.match(query, equipment=equipment, limit=limit)
+
+    def exercise_detail(self, exercise_id: str) -> dict:
+        """Full catalog detail (name, form cues, muscles, equipment) for one exercise."""
+        return self._catalog.detail_of(exercise_id)

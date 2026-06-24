@@ -89,8 +89,24 @@ def build_read_tools(repo: CoachRepo) -> list:
         uid = config["configurable"]["user_id"]
         return json.dumps(await repo.get_recent_measurements(uid, window_days))
 
+    @tool
+    async def explain_exercise(query: str, config: RunnableConfig) -> str:
+        """How to perform an exercise — its form cues / instructions, target muscles and equipment —
+        looked up by name. Call this for 'how do I do X', 'am I doing X right', or to explain
+        technique (including kegels / pelvic-floor moves). Returns the catalog's OWN instructions;
+        ground your form guidance in them and don't invent cues. If not found, say so plainly."""
+        import json
+        matches = repo.match_catalog(query, limit=1)
+        if not matches:
+            return json.dumps({"found": False, "query": query})
+        d = repo.exercise_detail(matches[0]["exercise_id"])
+        return json.dumps({"found": True, "name": d["name"], "equipment": d.get("equipment"),
+                           "category": d.get("category"), "primary_muscles": d.get("primary_muscles"),
+                           "secondary_muscles": d.get("secondary_muscles"), "cues": d.get("cues")})
+
     return [get_weight_trend, get_adherence, get_nutrition_summary, get_current_targets,
-            get_recent_vitals, get_today_plan, get_activity_energy, get_recent_measurements]
+            get_recent_vitals, get_today_plan, get_activity_energy, get_recent_measurements,
+            explain_exercise]
 
 
 def build_propose_tools(repo: CoachRepo) -> list:
