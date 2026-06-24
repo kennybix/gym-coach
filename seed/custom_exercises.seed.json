@@ -1,0 +1,116 @@
+[
+  {
+    "id": "Kegel_Hold_Slow",
+    "name": "Kegel Hold (Slow)",
+    "category": "pelvic floor",
+    "equipment": "none",
+    "equipment_tier": "bodyweight",
+    "base_movement": "kegel",
+    "force": "static",
+    "mechanic": "isolation",
+    "difficulty": "beginner",
+    "primary_muscles": ["pelvic floor"],
+    "secondary_muscles": [],
+    "image_urls": [],
+    "cues": [
+      "Find the muscles: squeeze as if stopping the flow of urine and holding back gas at the same time — you should feel a lift and tightening at the base of the pelvis, behind the testicles. Do NOT clench your glutes, abs, or thighs, and keep breathing.",
+      "Lift and hold for 5 seconds (build toward 10 over weeks), breathing normally, then fully relax for the same time. The complete relaxation between reps matters as much as the squeeze.",
+      "Endurance work — builds the strength that supports erections and control. Do it sitting, standing, or lying down; daily consistency beats intensity."
+    ]
+  },
+  {
+    "id": "Kegel_Quick_Flicks",
+    "name": "Kegel Quick Flicks (Fast)",
+    "category": "pelvic floor",
+    "equipment": "none",
+    "equipment_tier": "bodyweight",
+    "base_movement": "kegel",
+    "force": "static",
+    "mechanic": "isolation",
+    "difficulty": "beginner",
+    "primary_muscles": ["pelvic floor"],
+    "secondary_muscles": [],
+    "image_urls": [],
+    "cues": [
+      "Same lift as a slow kegel, but contract quickly and strongly, then release completely — roughly one squeeze per second.",
+      "These train the fast, reflexive control used to delay climax. Fully relax between each rep; don't recruit glutes or abs, and don't hold your breath.",
+      "Power/speed work — pair it with the slow holds."
+    ]
+  },
+  {
+    "id": "Reverse_Kegel",
+    "name": "Reverse Kegel (Relax & Lengthen)",
+    "category": "pelvic floor",
+    "equipment": "none",
+    "equipment_tier": "bodyweight",
+    "base_movement": "kegel",
+    "force": "static",
+    "mechanic": "isolation",
+    "difficulty": "beginner",
+    "primary_muscles": ["pelvic floor"],
+    "secondary_muscles": [],
+    "image_urls": [],
+    "cues": [
+      "Instead of lifting up, gently let the pelvic floor lengthen and bulge downward — the soft feeling of beginning to pass urine or gas, or a relaxed exhale. Stay gentle, never strain or push hard.",
+      "Hold the gentle lengthening for ~5 seconds, then return to neutral.",
+      "Just as important as squeezing: an over-tight pelvic floor hurts control and stamina. Balance every kegel session with these."
+    ]
+  },
+  {
+    "id": "Elevator_Kegel",
+    "name": "Elevator Kegels",
+    "category": "pelvic floor",
+    "equipment": "none",
+    "equipment_tier": "bodyweight",
+    "base_movement": "kegel",
+    "force": "static",
+    "mechanic": "isolation",
+    "difficulty": "intermediate",
+    "primary_muscles": ["pelvic floor"],
+    "secondary_muscles": [],
+    "image_urls": [],
+    "cues": [
+      "Contract the pelvic floor in graded steps: lift a little ('floor 1'), more ('floor 2'), to a strong lift ('floor 3'), then lower step by step back to fully relaxed ('ground').",
+      "Move slowly and with control, breathing throughout. One full trip up and down = one rep.",
+      "Builds awareness and graded control — the skill behind backing off right before climax."
+    ]
+  },
+  {
+    "id": "Bridge_Pelvic_Lift",
+    "name": "Glute Bridge + Pelvic Floor Lift",
+    "category": "pelvic floor",
+    "equipment": "none",
+    "equipment_tier": "bodyweight",
+    "base_movement": "bridge",
+    "force": "push",
+    "mechanic": "compound",
+    "difficulty": "beginner",
+    "primary_muscles": ["glutes"],
+    "secondary_muscles": ["pelvic floor", "hamstrings", "lower back"],
+    "image_urls": [],
+    "cues": [
+      "Lie on your back, knees bent, feet flat and hip-width. As you squeeze your glutes and lift your hips into a bridge, gently lift the pelvic floor (a kegel).",
+      "Hold at the top for 3–5 seconds with the floor engaged, then lower and fully relax everything.",
+      "Links hip and glute strength to pelvic-floor activation. Keep ribs down and breathe — don't hold your breath."
+    ]
+  },
+  {
+    "id": "Diaphragmatic_Breathing",
+    "name": "Diaphragmatic Breathing",
+    "category": "pelvic floor",
+    "equipment": "none",
+    "equipment_tier": "bodyweight",
+    "base_movement": "breathing",
+    "force": "static",
+    "mechanic": "isolation",
+    "difficulty": "beginner",
+    "primary_muscles": ["pelvic floor"],
+    "secondary_muscles": ["abdominals"],
+    "image_urls": [],
+    "cues": [
+      "Lie or sit relaxed, one hand on your belly. Breathe in slowly through the nose so the belly rises and the pelvic floor naturally relaxes/descends; breathe out and let it gently recoil.",
+      "Slow, calm breaths — about 4 seconds in, 6 out. No forcing.",
+      "Down-regulates an over-tense pelvic floor and links breath to control — the same calm breathing that helps you stay relaxed and last longer."
+    ]
+  }
+]

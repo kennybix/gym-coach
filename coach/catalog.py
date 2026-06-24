@@ -47,6 +47,11 @@ class CatalogVariantIndex:
     def from_seed(cls, seed_dir: str) -> "CatalogVariantIndex":
         d = Path(seed_dir)
         exercises = json.loads((d / "exercises.seed.json").read_text())
+        # Hand-authored exercises not in free-exercise-db (e.g. pelvic-floor / kegels). Kept in a
+        # separate file so a catalog re-ingest doesn't wipe them.
+        custom = d / "custom_exercises.seed.json"
+        if custom.exists():
+            exercises = exercises + json.loads(custom.read_text())
         groups = json.loads((d / "variant_groups.seed.json").read_text())
         return cls(exercises, groups)
 

@@ -35,6 +35,18 @@ TEMPLATES = [
     {"key": "mobility", "name": "Daily Mobility", "goal": "Flexibility", "sessions_per_week": 7,
      "exercises": [{"name": "cat stretch", "sets": 2, "reps": 10}, {"name": "calf stretch", "sets": 2, "reps": 1},
                    {"name": "chest stretch", "sets": 2, "reps": 1}, {"name": "lower back stretch", "sets": 2, "reps": 1}]},
+    {"key": "pelvic_floor", "name": "Pelvic Floor & Stamina", "goal": "Pelvic floor · men's stamina & control",
+     "sessions_per_week": 7,
+     "note": "General fitness for pelvic-floor strength, control and stamina — best done daily, and "
+             "balance the squeezes with the reverse/relaxation work. This is not medical treatment: "
+             "for erectile dysfunction, pain, or persistent concerns see a doctor or a pelvic-floor "
+             "physiotherapist.",
+     "exercises": [{"exercise_id": "Kegel_Hold_Slow", "sets": 3, "reps": 10},
+                   {"exercise_id": "Kegel_Quick_Flicks", "sets": 3, "reps": 15},
+                   {"exercise_id": "Reverse_Kegel", "sets": 2, "reps": 8},
+                   {"exercise_id": "Elevator_Kegel", "sets": 2, "reps": 6},
+                   {"exercise_id": "Bridge_Pelvic_Lift", "sets": 3, "reps": 12},
+                   {"exercise_id": "Diaphragmatic_Breathing", "sets": 1, "reps": 10}]},
 ]
 
 
@@ -43,19 +55,21 @@ def _custom_id(name: str) -> str:
 
 
 def resolve_exercises(items: list[dict], catalog) -> list[dict]:
-    """Map each {name/query, sets, reps} to a catalog exercise_id (best match) or a custom id."""
+    """Map each item to a catalog exercise_id. An explicit exercise_id wins (curated templates);
+    otherwise match the free-text name to the catalog, or mint a custom id."""
     out = []
     for it in items:
+        sets, reps = _int(it.get("sets")) or 3, _int(it.get("reps")) or 10
+        exid = str(it.get("exercise_id") or "").strip()
+        if exid:
+            out.append({"exercise_id": exid, "name": catalog.name_of(exid), "sets": sets, "reps": reps})
+            continue
         q = str(it.get("name") or it.get("query") or "").strip()
         if not q:
             continue
         m = catalog.match(q, limit=1)
-        if m:
-            exid, nm = m[0]["exercise_id"], m[0]["name"]
-        else:
-            exid, nm = _custom_id(q), q
-        out.append({"exercise_id": exid, "name": nm,
-                    "sets": _int(it.get("sets")) or 3, "reps": _int(it.get("reps")) or 10})
+        exid, nm = (m[0]["exercise_id"], m[0]["name"]) if m else (_custom_id(q), q)
+        out.append({"exercise_id": exid, "name": nm, "sets": sets, "reps": reps})
     return out
 
 
@@ -64,7 +78,7 @@ def template_program(key: str, catalog) -> dict | None:
     if not t:
         return None
     return {"name": t["name"], "goal": t["goal"], "sessions_per_week": t["sessions_per_week"],
-            "exercises": resolve_exercises(t["exercises"], catalog), "note": None}
+            "exercises": resolve_exercises(t["exercises"], catalog), "note": t.get("note")}
 
 
 # ----------------------------- AI generation ---------------------------------
@@ -76,7 +90,11 @@ DESIGN_PROMPT = (
     "give sensible sets and reps (reps = seconds or count). Keep total volume MODERATE and "
     "beginner-safe. If the goal is health/medical (e.g. pelvic-floor/kegels, rehab, post-surgery), "
     "give only general fitness guidance and set note to advise seeing a relevant specialist — never "
-    "clinical/medical instructions."
+    "clinical/medical instructions.\n"
+    "For pelvic-floor / sexual-stamina / lasting-longer / kegel goals (men), USE THESE EXACT exercise "
+    "names so they resolve to the right moves, and always include BOTH squeezes and relaxation work: "
+    "'Kegel Hold (Slow)', 'Kegel Quick Flicks (Fast)', 'Reverse Kegel (Relax & Lengthen)', "
+    "'Elevator Kegels', 'Glute Bridge + Pelvic Floor Lift', 'Diaphragmatic Breathing'."
 )
 
 
