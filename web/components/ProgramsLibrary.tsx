@@ -5,8 +5,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   addProgram, configured, deleteProgram, designProgram, getTemplate, listPrograms, listTemplates,
-  setProgramActive, type DesignedProgram, type ProgramSummary, type TemplateSummary,
+  setProgramActive, setProgramSchedule, type DesignedProgram, type ProgramSummary, type TemplateSummary,
 } from "@/lib/api";
+
+const DOW = ["S", "M", "T", "W", "T", "F", "S"]; // 0=Sun..6=Sat
 import NumField from "./NumField";
 
 type View = { kind: "list" } | { kind: "add" } | { kind: "review"; draft: DesignedProgram };
@@ -50,6 +52,13 @@ export default function ProgramsLibrary() {
   const remove = async (p: ProgramSummary) => {
     setPrograms((xs) => xs.filter((x) => x.program_id !== p.program_id));
     await deleteProgram(p.program_id);
+  };
+  const schedule = async (p: ProgramSummary, day: number) => {
+    const days = p.scheduled_days.includes(day)
+      ? p.scheduled_days.filter((d) => d !== day)
+      : [...p.scheduled_days, day].sort((a, b) => a - b);
+    setPrograms((xs) => xs.map((x) => (x.program_id === p.program_id ? { ...x, scheduled_days: days } : x)));
+    await setProgramSchedule(p.program_id, days);
   };
 
   // ---- review/install ----
@@ -132,18 +141,34 @@ export default function ProgramsLibrary() {
       ) : (
         <div className="space-y-2.5">
           {programs.map((p) => (
-            <div key={p.program_id} className="card p-4 flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{p.name}</p>
-                <p className="text-dim text-xs">{p.goal ? `${p.goal} · ` : ""}{p.exercises} exercises · {p.sessions_per_week}×/wk</p>
+            <div key={p.program_id} className="card p-4">
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{p.name}</p>
+                  <p className="text-dim text-xs">{p.goal ? `${p.goal} · ` : ""}{p.exercises} exercises</p>
+                </div>
+                <button onClick={() => toggle(p)} className={`chip px-2.5 py-1 text-[11px] font-semibold shrink-0 ${p.is_active ? "text-ink bg-volt border-volt" : "text-dim"}`}>
+                  {p.is_active ? "Active" : "Off"}
+                </button>
+                <button onClick={() => remove(p)} aria-label="delete" className="text-dim hover:text-alert px-1 text-lg shrink-0">×</button>
               </div>
-              <button onClick={() => toggle(p)} className={`chip px-2.5 py-1 text-[11px] font-semibold shrink-0 ${p.is_active ? "text-ink bg-volt border-volt" : "text-dim"}`}>
-                {p.is_active ? "Active" : "Off"}
-              </button>
-              <button onClick={() => remove(p)} aria-label="delete" className="text-dim hover:text-alert px-1 text-lg shrink-0">×</button>
+              {p.is_active && (
+                <div className="flex items-center gap-1 mt-3">
+                  {DOW.map((d, i) => {
+                    const set = p.scheduled_days.includes(i);
+                    return (
+                      <button key={i} onClick={() => schedule(p, i)}
+                        className={`w-7 h-7 rounded-md text-[11px] font-semibold transition-colors ${set ? "bg-volt text-ink" : "bg-panel2 text-dim active:text-bone"}`}>
+                        {d}
+                      </button>
+                    );
+                  })}
+                  <span className="text-dim text-[11px] ml-2">{p.scheduled_days.length === 0 ? "every day" : "scheduled"}</span>
+                </div>
+              )}
             </div>
           ))}
-          <p className="text-dim text-xs px-1">Active programs all show on Today. Toggle one off to pause it without deleting.</p>
+          <p className="text-dim text-xs px-1">Pick the days a program runs (none = every day). Today shows only what&apos;s scheduled. Toggle Off to pause without deleting.</p>
         </div>
       )}
     </div>

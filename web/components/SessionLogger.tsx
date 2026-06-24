@@ -238,10 +238,10 @@ export default function SessionLogger() {
       {allSlots.length === 0 ? (
         <Panel>
           <p className="text-dim text-sm leading-relaxed">
-            No exercises yet. Build a program you&apos;ll follow, or start a session and add exercises
-            on the fly.
+            Nothing scheduled for today — enjoy the rest, or start a session and add exercises on
+            the fly. Set up programs and which days they run under Programs.
           </p>
-          <Link href="/program" className="btn btn-primary h-12 w-full mt-4">Build program</Link>
+          <Link href="/programs" className="btn btn-primary h-12 w-full mt-4">My programs</Link>
         </Panel>
       ) : (
         <div className="space-y-4">

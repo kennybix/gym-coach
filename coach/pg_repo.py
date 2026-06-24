@@ -312,8 +312,11 @@ class PostgresCoachRepo:
         return str(row["review_id"])
 
     # --- logging API (PWA Today screen; idempotent for offline replay) --------
-    async def get_program_slots(self, user_id: str) -> list[dict]:
-        """Program slots with prescriptions + catalog media, for the session UI."""
+    async def get_program_slots(self, user_id: str, scheduled_only: bool = False) -> list[dict]:
+        """Program slots with prescriptions + catalog media, for the session UI. With
+        scheduled_only, returns just the programs scheduled for TODAY (server weekday); a program
+        with no schedule (NULL/empty scheduled_days) runs every day. Off (default) returns all
+        active slots (used by coach program-change proposals, which may touch any exercise)."""
         rows = await self._pool.fetch(
             """
             select pe.program_exercise_id, pe.exercise_id, pe.position,
@@ -322,9 +325,13 @@ class PostgresCoachRepo:
             from program_exercises pe
             join programs p on p.program_id = pe.program_id
             where p.user_id = $1::uuid and p.is_active
+              and (not $2::bool
+                   or p.scheduled_days is null
+                   or array_length(p.scheduled_days, 1) is null
+                   or extract(dow from current_date)::int = any(p.scheduled_days))
             order by p.created_at, pe.position
             """,
-            user_id,
+            user_id, scheduled_only,
         )
         # Last working set per exercise (latest session, heaviest non-warmup) → deterministic
         # next-load suggestion. System-computed; the coach only explains it, never overrides.
@@ -1163,7 +1170,7 @@ class PostgresCoachRepo:
 
     async def list_programs(self, user_id: str) -> list[dict]:
         rows = await self._pool.fetch(
-            """select p.program_id, p.name, p.goal, p.sessions_per_week, p.is_active,
+            """select p.program_id, p.name, p.goal, p.sessions_per_week, p.is_active, p.scheduled_days,
                       count(pe.program_exercise_id) as n
                from programs p
                left join program_exercises pe on pe.program_id = p.program_id
@@ -1173,12 +1180,20 @@ class PostgresCoachRepo:
         )
         return [{"program_id": str(r["program_id"]), "name": r["name"], "goal": r["goal"],
                  "sessions_per_week": r["sessions_per_week"], "is_active": r["is_active"],
+                 "scheduled_days": list(r["scheduled_days"]) if r["scheduled_days"] else [],
                  "exercises": int(r["n"])} for r in rows]
 
     async def set_program_active(self, user_id: str, program_id: str, active: bool) -> None:
         await self._pool.execute(
             "update programs set is_active = $3 where program_id = $1::uuid and user_id = $2::uuid",
             program_id, user_id, active,
+        )
+
+    async def set_program_schedule(self, user_id: str, program_id: str, days) -> None:
+        """days = list of weekday ints (0=Sun..6=Sat), or None/empty for every day."""
+        await self._pool.execute(
+            "update programs set scheduled_days = $3 where program_id = $1::uuid and user_id = $2::uuid",
+            program_id, user_id, (sorted(set(int(d) for d in days if 0 <= int(d) <= 6)) or None) if days else None,
         )
 
     async def delete_program(self, user_id: str, program_id: str) -> None:

@@ -14,7 +14,7 @@ su postgres -c "psql -tc \"select 1 from pg_database where datname='coachdb'\"" 
 if ! PGPASSWORD=coach psql -h localhost -U coach -d coachdb -tc \
      "select 1 from information_schema.tables where table_name='profiles'" | grep -q 1; then
   for f in coach/migrations/001_core.sql coach/migrations/003_targets_append_only.sql \
-           coach/migrations/004_pgvector.sql coach/migrations/005_vitals.sql coach/migrations/006_food_entries.sql coach/migrations/007_cardio.sql coach/migrations/008_set_type.sql coach/migrations/009_food_macros.sql coach/migrations/010_meals.sql coach/migrations/011_measurements.sql coach/migrations/012_progress_photos.sql coach/migrations/013_belly.sql coach/migrations/014_coach_messages.sql coach/migrations/015_set_incline.sql coach/migrations/016_program_goal.sql; do
+           coach/migrations/004_pgvector.sql coach/migrations/005_vitals.sql coach/migrations/006_food_entries.sql coach/migrations/007_cardio.sql coach/migrations/008_set_type.sql coach/migrations/009_food_macros.sql coach/migrations/010_meals.sql coach/migrations/011_measurements.sql coach/migrations/012_progress_photos.sql coach/migrations/013_belly.sql coach/migrations/014_coach_messages.sql coach/migrations/015_set_incline.sql coach/migrations/016_program_goal.sql coach/migrations/017_program_schedule.sql; do
     PGPASSWORD=coach psql -h localhost -U coach -d coachdb -v ON_ERROR_STOP=1 -q -f "$f"
   done
   echo "migrations applied (001, 003, 004)"

@@ -137,7 +137,7 @@ export async function parseFoodPhoto(
 }
 
 /* ---- program library ---- */
-export type ProgramSummary = { program_id: string; name: string; goal: string | null; sessions_per_week: number; is_active: boolean; exercises: number };
+export type ProgramSummary = { program_id: string; name: string; goal: string | null; sessions_per_week: number; is_active: boolean; scheduled_days: number[]; exercises: number };
 export type TemplateSummary = { key: string; name: string; goal: string; sessions_per_week: number; count: number };
 export type DesignedExercise = { exercise_id: string; name: string; sets: number; reps: number };
 export type DesignedProgram = { name: string; goal: string | null; sessions_per_week: number; exercises: DesignedExercise[]; note: string | null };
@@ -157,6 +157,7 @@ export async function designProgram(goal: string): Promise<DesignedProgram | { u
 export const addProgram = (p: { name: string; goal: string | null; sessions_per_week: number; exercises: { exercise_id: string; sets: number; reps: number }[] }) =>
   apiPost("/api/programs", p);
 export const setProgramActive = (program_id: string, active: boolean) => apiPost("/api/programs/active", { program_id, active });
+export const setProgramSchedule = (program_id: string, days: number[]) => apiPost("/api/programs/schedule", { program_id, days });
 export const deleteProgram = (program_id: string) => apiPost("/api/programs/delete", { program_id });
 
 /* ---- coach endpoints (separate from /api; may be 503 if no LLM configured) ---- */

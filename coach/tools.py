@@ -61,7 +61,7 @@ def build_read_tools(repo: CoachRepo) -> list:
         explain progression — never invent a load; cite suggested_kg."""
         import json
         uid = config["configurable"]["user_id"]
-        slots = await repo.get_program_slots(uid)
+        slots = await repo.get_program_slots(uid, scheduled_only=True)
         compact = [
             {"name": s["name"], "sets": s["sets"], "reps": s["reps"],
              "suggested_kg": s.get("suggested_kg"), "reason": s.get("suggested_reason")}

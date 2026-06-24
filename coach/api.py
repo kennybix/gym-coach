@@ -38,7 +38,7 @@ def _now() -> datetime:
 
 @router.get("/program/today")
 async def program_today(user_id: str = Depends(get_current_user_id)):
-    slots = await _repo.get_program_slots(user_id)
+    slots = await _repo.get_program_slots(user_id, scheduled_only=True)
     meta = await _repo.get_active_program_meta(user_id)
     return {"date": _now().date().isoformat(), "slots": slots, "program": meta}
 
@@ -776,6 +776,17 @@ class ProgramActiveIn(BaseModel):
 @router.post("/programs/active")
 async def programs_active(body: ProgramActiveIn, user_id: str = Depends(get_current_user_id)):
     await _repo.set_program_active(user_id, body.program_id, body.active)
+    return {"status": "ok"}
+
+
+class ProgramScheduleIn(BaseModel):
+    program_id: str
+    days: list[int] = Field(default_factory=list)  # 0=Sun..6=Sat; empty = every day
+
+
+@router.post("/programs/schedule")
+async def programs_schedule(body: ProgramScheduleIn, user_id: str = Depends(get_current_user_id)):
+    await _repo.set_program_schedule(user_id, body.program_id, body.days)
     return {"status": "ok"}
 
 
