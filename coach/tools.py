@@ -104,9 +104,25 @@ def build_read_tools(repo: CoachRepo) -> list:
                            "category": d.get("category"), "primary_muscles": d.get("primary_muscles"),
                            "secondary_muscles": d.get("secondary_muscles"), "cues": d.get("cues")})
 
+    @tool
+    async def get_exercise_consistency(query: str, window_days: int, config: RunnableConfig) -> str:
+        """How consistently the user has logged an exercise or group over the window — distinct
+        days logged, total sets, and the last date. Matches the query to exercises (by name or
+        category, e.g. 'kegels', 'pelvic floor', 'squat'). Use for 'have I been keeping up with X?'.
+        Ground your answer in days_logged/last_date; don't guess."""
+        import json
+        uid = config["configurable"]["user_id"]
+        matches = repo.match_catalog(query, limit=8)
+        ids = [m["exercise_id"] for m in matches]
+        if not ids:
+            return json.dumps({"found": False, "query": query})
+        data = await repo.get_exercise_consistency(uid, ids, window_days)
+        return json.dumps({"found": True, "matched": [m["name"] for m in matches[:5]],
+                           "window_days": window_days, **data})
+
     return [get_weight_trend, get_adherence, get_nutrition_summary, get_current_targets,
             get_recent_vitals, get_today_plan, get_activity_energy, get_recent_measurements,
-            explain_exercise]
+            explain_exercise, get_exercise_consistency]
 
 
 def build_propose_tools(repo: CoachRepo) -> list:

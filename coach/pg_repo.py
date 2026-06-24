@@ -1242,3 +1242,17 @@ class PostgresCoachRepo:
     def exercise_detail(self, exercise_id: str) -> dict:
         """Full catalog detail (name, form cues, muscles, equipment) for one exercise."""
         return self._catalog.detail_of(exercise_id)
+
+    async def get_exercise_consistency(self, user_id: str, exercise_ids: list[str], window_days: int = 30) -> dict:
+        """How consistently a set of exercises was logged: distinct days, total sets, last date."""
+        row = await self._pool.fetchrow(
+            """select count(distinct sl.logged_at::date) as days_logged,
+                      count(*) as total_sets,
+                      max(sl.logged_at)::date as last_date
+               from set_logs sl
+               where sl.user_id = $1::uuid and sl.exercise_id = any($2::text[])
+                 and sl.logged_at >= now() - make_interval(days => $3::int)""",
+            user_id, exercise_ids, window_days,
+        )
+        return {"days_logged": row["days_logged"] or 0, "total_sets": row["total_sets"] or 0,
+                "last_date": row["last_date"].isoformat() if row["last_date"] else None}

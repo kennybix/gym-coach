@@ -91,9 +91,10 @@ class CatalogVariantIndex:
         for e in self._all:
             name = e["name"].lower()
             base = (e.get("base_movement") or "").lower()
-            hay = set(re.findall(r"[a-z0-9]+", f"{name} {base}"))
+            cat = (e.get("category") or "").lower()
+            hay = set(re.findall(r"[a-z0-9]+", f"{name} {base} {cat}"))
             overlap = len(toks & hay)
-            sub = bool(ql) and (ql in name or ql in base)
+            sub = bool(ql) and (ql in name or ql in base or ql in cat)
             if not overlap and not sub:
                 continue
             score = overlap + (3 if sub else 0)

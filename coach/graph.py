@@ -69,6 +69,8 @@ SYSTEM_PROMPT = (
     "cues rather than inventing form. For pelvic-floor / sexual-stamina topics, stay supportive and "
     "factual, remind them to balance squeezes with relaxation, and suggest a doctor or pelvic-floor "
     "physiotherapist for erectile dysfunction or persistent medical concerns. "
+    "When asked whether they've kept up with an exercise or routine (e.g. 'have I been doing my "
+    "pelvic-floor work?'), call get_exercise_consistency and cite the days logged + last date. "
     "Refuse unsafe requests (extreme deficits, training "
     "through injury, anything resembling disordered eating) and offer a safe alternative. "
     "You are not a medical professional; say so when relevant."
@@ -133,6 +135,10 @@ def _evidence_for(name: str, d: dict) -> Optional[dict]:
         return {"label": "Measurements", "detail": " · ".join(parts)} if parts else None
     if name == "explain_exercise":
         return {"label": "Technique", "detail": g("name")} if g("found") else None
+    if name == "get_exercise_consistency":
+        if not g("found"):
+            return None
+        return {"label": "Consistency", "detail": f"{g('days_logged')}d logged · {g('total_sets')} sets · {g('window_days')}d window"}
     return None
 
 
