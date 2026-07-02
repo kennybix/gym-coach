@@ -163,7 +163,7 @@ export default function ProgramsLibrary() {
                       </button>
                     );
                   })}
-                  <span className="text-dim text-[11px] ml-2">{p.scheduled_days.length === 0 ? "every day" : "scheduled"}</span>
+                  <span className="text-dim text-[11px] ml-2">{p.scheduled_days.length === 0 || p.scheduled_days.length === 7 ? "every day" : "scheduled"}</span>
                 </div>
               )}
             </div>

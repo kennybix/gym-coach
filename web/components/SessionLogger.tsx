@@ -69,6 +69,9 @@ export default function SessionLogger() {
   const [resting, setResting] = useState<{ exercise: string; nextSet: string } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("today_collapsed") || "[]")); } catch { return new Set(); }
+  });
   const [showDescribe, setShowDescribe] = useState(false);
   const [describedTick, setDescribedTick] = useState(false);
 
@@ -211,6 +214,23 @@ export default function SessionLogger() {
 
   const allSlots = [...slots, ...(session?.adhoc ?? [])];
 
+  // group consecutive slots by program (adhoc slots have no program_name)
+  const groups: { name: string; slots: ProgramSlot[] }[] = [];
+  for (const s of allSlots) {
+    const name = s.program_name || "";
+    const last = groups[groups.length - 1];
+    if (last && last.name === name) last.slots.push(s);
+    else groups.push({ name, slots: [s] });
+  }
+  const multiProgram = groups.filter((g) => g.name).length > 1;
+  const toggleCollapse = (name: string) =>
+    setCollapsed((c) => {
+      const n = new Set(c);
+      n.has(name) ? n.delete(name) : n.add(name);
+      try { localStorage.setItem("today_collapsed", JSON.stringify([...n])); } catch {}
+      return n;
+    });
+
   return (
     <div className="space-y-5">
       <Header online={online} queued={queued} />
@@ -245,17 +265,28 @@ export default function SessionLogger() {
         </Panel>
       ) : (
         <div className="space-y-4">
-          {(() => {
-            // group by program when more than one is active, so parallel routines read clearly
-            const showHeaders = new Set(allSlots.map((s) => s.program_name).filter(Boolean)).size > 1;
-            let lastProg: string | undefined;
-            return allSlots.map((slot, i) => {
-              const header = showHeaders && slot.program_name && slot.program_name !== lastProg ? slot.program_name : null;
-              lastProg = slot.program_name ?? lastProg;
-              return (
-                <div key={slot.program_exercise_id} className="space-y-4">
-                  {header && <p className="eyebrow px-1 pt-1">{header}</p>}
+          {groups.map((g, gi) => {
+            const folded = multiProgram && g.name && collapsed.has(g.name);
+            const doneCount = session
+              ? g.slots.filter((s) => session.logged.some((l) => l.slotId === s.program_exercise_id)).length
+              : 0;
+            return (
+              <div key={g.name || `adhoc-${gi}`} className="space-y-4">
+                {multiProgram && g.name && (
+                  <button onClick={() => toggleCollapse(g.name)} className="w-full flex items-center justify-between px-1 pt-1 active:opacity-70">
+                    <span className="eyebrow">{g.name}</span>
+                    <span className="text-dim text-xs flex items-center gap-1.5">
+                      {doneCount > 0 && <span className="text-volt">{doneCount}/{g.slots.length}</span>}
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                        strokeLinecap="round" strokeLinejoin="round" style={{ transform: folded ? "rotate(-90deg)" : "none" }}>
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </span>
+                  </button>
+                )}
+                {!folded && g.slots.map((slot, i) => (
                   <SlotCard
+                    key={slot.program_exercise_id}
                     slot={slot}
                     index={i}
                     active={Boolean(session)}
@@ -265,10 +296,10 @@ export default function SessionLogger() {
                     onRemoveSet={removeSet}
                     onEditSet={editSet}
                   />
-                </div>
-              );
-            });
-          })()}
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
 
