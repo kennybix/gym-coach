@@ -23,7 +23,14 @@ export default function ExerciseAnimation({
   }, [frames.length, intervalMs]);
 
   if (frames.length === 0) {
-    return <div className={`bg-panel2 border border-line ${className}`} aria-label={alt} />;
+    // no catalog image (e.g. kegels / custom moves) — a subtle dumbbell placeholder beats a blank box
+    return (
+      <div className={`bg-panel2 border border-line flex items-center justify-center ${className}`} aria-label={alt}>
+        <svg width="38%" height="38%" viewBox="0 0 24 24" fill="none" stroke="var(--color-dim)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m6.5 6.5 11 11M21 21l-1-1M3 3l1 1M18 22l4-4M2 6l4-4M3 10l7-7M14 21l7-7" />
+        </svg>
+      </div>
+    );
   }
   return (
     <div className={`relative overflow-hidden bg-panel2 ${className}`}>

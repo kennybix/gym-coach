@@ -56,7 +56,8 @@ class CatalogVariantIndex:
         return cls(exercises, groups)
 
     def name_of(self, exercise_id: str) -> str:
-        return self._name.get(exercise_id, exercise_id)
+        # custom/non-catalog ids fall back to a readable de-underscored label ("Bird_Dog" -> "Bird Dog")
+        return self._name.get(exercise_id) or (exercise_id or "").replace("_", " ")
 
     def equipment_of(self, exercise_id: str) -> str:
         return self._equipment.get(exercise_id, "other")
