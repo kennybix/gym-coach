@@ -149,3 +149,25 @@ def test_outbound_catches_unsafe_reply():
 
 def test_outbound_passes_normal_reply():
     assert not safety.screen_coach_reply("Your trend is steady — let's keep the current plan and check back next week.").flagged
+
+
+# --- negation-aware outbound: reassurance must NOT be flagged (the over-strict-coach fix) ----
+def test_outbound_allows_reassuring_mentions():
+    # the coach naming these while telling the user NOT to do them must pass through
+    assert not safety.screen_coach_reply(
+        "You don't need to starve or crash diet — a modest deficit with strength work is plenty."
+    ).flagged
+    assert not safety.screen_coach_reply("Avoid crash diets; they backfire.").flagged
+    assert not safety.screen_coach_reply("You can trim your tummy without starving yourself.").flagged
+
+
+def test_outbound_still_flags_genuine_bad_advice():
+    assert safety.screen_coach_reply("You should starve yourself to hit the goal faster.").flagged
+    assert safety.screen_coach_reply("Just stop eating after 6pm and do a crash diet for two weeks.").flagged
+
+
+# --- inbound: normal body-image comments are NOT disordered-eating flags --------------------
+def test_inbound_benign_body_comments_pass():
+    assert not safety.screen_user_message("my belly is so big").flagged
+    assert not safety.screen_user_message("will I get the tummy trim I want or just keep bulking").flagged
+    assert not safety.screen_user_message("i want to last longer during sex, help with kegels").flagged
