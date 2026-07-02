@@ -7,7 +7,8 @@
     "start": "next start",
     "build:native": "NATIVE_BUILD=1 NEXT_PUBLIC_API_URL=https://gym-coach.taile8b1de.ts.net next build",
     "native:sync": "npm run build:native && npx cap sync android",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "test": "vitest run"
   },
   "dependencies": {
     "@capacitor/android": "^7.6.6",
@@ -28,8 +29,11 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.1.1",
     "patch-package": "^8.0.1",
     "tailwindcss": "^4.1.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.9"
   }
 }
