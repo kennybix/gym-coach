@@ -13,7 +13,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Optional
 
+import openai
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -62,6 +64,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.exception_handler(openai.APIError)
+async def _llm_unavailable(request, exc):
+    # LLM provider hiccup (rate-limit/cooldown, connection, upstream error) -> graceful 503, not a
+    # hard 500. The PWA already treats coach 503s as "coach unavailable" instead of crashing.
+    logging.warning("coach LLM unavailable -> 503: %s", exc)
+    return JSONResponse(status_code=503, content={"detail": "coach temporarily unavailable — the model is busy, try again shortly"})
+
+
 app.include_router(rest_api.router)
 from .rag.service import router as rag_router  # noqa: E402 — after app config
 app.include_router(rag_router)
