@@ -4,8 +4,8 @@
    Generated/template programs land in a review screen you can edit before installing. */
 import { useCallback, useEffect, useState } from "react";
 import {
-  addProgram, configured, deleteProgram, designProgram, getTemplate, listPrograms, listTemplates,
-  setProgramActive, setProgramSchedule, type DesignedProgram, type ProgramSummary, type TemplateSummary,
+  addProgram, clearInactivePrograms, configured, deleteProgram, designProgram, getTemplate, listPrograms,
+  listTemplates, setProgramActive, setProgramSchedule, type DesignedProgram, type ProgramSummary, type TemplateSummary,
 } from "@/lib/api";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"]; // 0=Sun..6=Sat
@@ -169,6 +169,14 @@ export default function ProgramsLibrary() {
             </div>
           ))}
           <p className="text-dim text-xs px-1">Pick the days a program runs (none = every day). Today shows only what&apos;s scheduled. Toggle Off to pause without deleting.</p>
+          {programs.filter((p) => !p.is_active).length > 1 && (
+            <button
+              onClick={async () => { await clearInactivePrograms(); refresh(); }}
+              className="text-dim text-xs active:text-alert underline underline-offset-2 px-1"
+            >
+              Clear {programs.filter((p) => !p.is_active).length} paused / old programs
+            </button>
+          )}
         </div>
       )}
     </div>

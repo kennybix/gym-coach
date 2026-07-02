@@ -1202,6 +1202,14 @@ class PostgresCoachRepo:
             program_id, user_id,
         )
 
+    async def delete_inactive_programs(self, user_id: str) -> int:
+        """Clear paused/old (inactive) programs. Safe for history — sessions.program_id is
+        ON DELETE SET NULL, so logged workouts are kept (just unlinked)."""
+        status = await self._pool.execute(
+            "delete from programs where user_id = $1::uuid and not is_active", user_id,
+        )
+        return int(status.rsplit(" ", 1)[-1])
+
     async def get_active_program_meta(self, user_id: str) -> Optional[dict]:
         """Name + cadence of the active program, so an editor can preserve them on save."""
         row = await self._pool.fetchrow(

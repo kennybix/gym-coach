@@ -159,6 +159,7 @@ export const addProgram = (p: { name: string; goal: string | null; sessions_per_
 export const setProgramActive = (program_id: string, active: boolean) => apiPost("/api/programs/active", { program_id, active });
 export const setProgramSchedule = (program_id: string, days: number[]) => apiPost("/api/programs/schedule", { program_id, days });
 export const deleteProgram = (program_id: string) => apiPost("/api/programs/delete", { program_id });
+export const clearInactivePrograms = () => apiPost<{ deleted: number }>("/api/programs/clear-inactive", {});
 
 /* ---- coach endpoints (separate from /api; may be 503 if no LLM configured) ---- */
 export type Evidence = { label: string; detail: string };

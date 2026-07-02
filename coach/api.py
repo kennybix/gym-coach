@@ -798,3 +798,8 @@ class ProgramDeleteIn(BaseModel):
 async def programs_delete(body: ProgramDeleteIn, user_id: str = Depends(get_current_user_id)):
     await _repo.delete_program(user_id, body.program_id)
     return {"status": "ok"}
+
+
+@router.post("/programs/clear-inactive")
+async def programs_clear_inactive(user_id: str = Depends(get_current_user_id)):
+    return {"status": "ok", "deleted": await _repo.delete_inactive_programs(user_id)}
