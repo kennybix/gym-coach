@@ -107,9 +107,18 @@ export default function TrendsView() {
     <Wrap>
       <Card delay={60}>
         <p className="eyebrow mb-3">This block · last {data.window_days} days</p>
-        <Bar label="Sessions" done={data.adherence.sessions_completed} total={data.adherence.sessions_prescribed} />
-        <div className="h-4" />
-        <Bar label="Sets" done={data.adherence.sets_completed} total={data.adherence.sets_prescribed} />
+        {/* Effort counts, not a ratio to an inflated multi-program target — consistency, not judgment. */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="font-display tnum text-3xl font-bold text-volt leading-none">{data.adherence.sessions_completed}</p>
+            <p className="text-dim text-xs mt-1.5">sessions trained</p>
+          </div>
+          <div>
+            <p className="font-display tnum text-3xl font-bold leading-none">{data.adherence.sets_completed}</p>
+            <p className="text-dim text-xs mt-1.5">sets logged</p>
+          </div>
+        </div>
+        <p className="text-dim text-xs mt-3 leading-relaxed">Showing up is the win — consistency beats any single number.</p>
       </Card>
 
       <Card delay={120}>
@@ -213,20 +222,4 @@ function Wrap({ children }: { children: React.ReactNode }) {
 }
 function Card({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   return <div className="card p-5 rise" style={{ animationDelay: `${delay}ms` }}>{children}</div>;
-}
-function Bar({ label, done, total }: { label: string; done: number; total: number }) {
-  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
-  return (
-    <div>
-      <div className="flex justify-between items-baseline text-sm mb-2">
-        <span className="text-bone/90 font-medium">{label}</span>
-        <span className="tnum text-dim">
-          <span className="text-bone font-semibold">{done}</span> / {total || "?"}
-        </span>
-      </div>
-      <div className="h-2.5 bg-line rounded-full overflow-hidden">
-        <div className="h-full bg-volt rounded-full" style={{ width: `${pct}%`, transition: "width 600ms cubic-bezier(0.2,0.7,0.2,1)" }} />
-      </div>
-    </div>
-  );
 }
