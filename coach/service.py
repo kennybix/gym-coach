@@ -107,15 +107,23 @@ async def chat(body: ChatIn, user_id: str = Depends(get_current_user_id)):
         raise HTTPException(503, "coach unavailable: LLM provider not configured")
     config = _cfg(user_id, body.thread_id)
     repo = _state["repo"]
-    await repo.save_coach_message(user_id, body.thread_id, "user", body.message)
+    # Invoke FIRST, persist after: saving the user message up front left orphaned/duplicated
+    # turns in the transcript whenever the LLM errored and the user retried.
     result = await graph.ainvoke({"messages": [HumanMessage(body.message)]}, config=config)
 
     snapshot = await graph.aget_state(config)
     pending = [t for t in snapshot.tasks if getattr(t, "interrupts", None)]
     if pending:
-        return {"status": "needs_confirmation", "payload": pending[0].interrupts[0].value}
+        payload = pending[0].interrupts[0].value
+        await repo.save_coach_message(user_id, body.thread_id, "user", body.message)
+        # record the proposal too, so a restored thread shows what the follow-up reply approved
+        reason = (payload or {}).get("reason") if isinstance(payload, dict) else None
+        await repo.save_coach_message(user_id, body.thread_id, "coach",
+                                      f"Proposed a change{f': {reason}' if reason else ''} (awaiting your approve/decline).")
+        return {"status": "needs_confirmation", "payload": payload}
     reply = result["messages"][-1].content
     evidence = summarize_evidence(result["messages"])
+    await repo.save_coach_message(user_id, body.thread_id, "user", body.message)
     await repo.save_coach_message(user_id, body.thread_id, "coach", reply, evidence or None)
     return {"status": "ok", "reply": reply, "evidence": evidence}
 

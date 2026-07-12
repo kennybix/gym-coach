@@ -143,10 +143,10 @@ export default function ProgramsLibrary() {
           {programs.map((p) => (
             <div key={p.program_id} className="card p-4">
               <div className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
+                <a href={`/program?id=${p.program_id}`} className="min-w-0 flex-1 active:opacity-70">
                   <p className="text-sm font-medium truncate">{p.name}</p>
-                  <p className="text-dim text-xs">{p.goal ? `${p.goal} · ` : ""}{p.exercises} exercises</p>
-                </div>
+                  <p className="text-dim text-xs">{p.goal ? `${p.goal} · ` : ""}{p.exercises} exercises · tap to edit</p>
+                </a>
                 <button onClick={() => toggle(p)} className={`chip px-2.5 py-1 text-[11px] font-semibold shrink-0 ${p.is_active ? "text-ink bg-volt border-volt" : "text-dim"}`}>
                   {p.is_active ? "Active" : "Off"}
                 </button>

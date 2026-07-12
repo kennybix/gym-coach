@@ -90,6 +90,33 @@ def test_exercise_consistency_counts_distinct_days():
     asyncio.run(go())
 
 
+def test_update_program_edits_in_place_without_touching_others():
+    async def go():
+        async with throwaway_repo() as (repo, uid, _pool):
+            pid_a = await repo.add_program(uid, "A", 3, [{"exercise_id": "Plank", "sets": 3, "reps": 1}])
+            pid_b = await repo.add_program(uid, "B", 7, [{"exercise_id": "Kegel_Hold_Slow", "sets": 3, "reps": 10}])
+            await repo.update_program_exercises(uid, pid_a, "A2", 4,
+                                                [{"exercise_id": "Barbell_Squat", "sets": 5, "reps": 5}])
+            progs = {p["program_id"]: p for p in await repo.list_programs(uid)}
+            # edited program updated in place…
+            assert progs[pid_a]["name"] == "A2" and progs[pid_a]["exercises"] == 1
+            # …and the OTHER program is completely untouched and still active (the old replace-all
+            # editor deactivated everything — this is the regression test for that landmine)
+            assert progs[pid_b]["is_active"] and progs[pid_b]["name"] == "B"
+            detail = await repo.get_program_detail(uid, pid_a)
+            assert [e["exercise_id"] for e in detail["exercises"]] == ["Barbell_Squat"]
+    asyncio.run(go())
+
+
+def test_update_program_rejects_foreign_program():
+    async def go():
+        async with throwaway_repo() as (repo, uid, _pool):
+            with pytest.raises(PermissionError):
+                await repo.update_program_exercises(uid, str(uuid.uuid4()), "X", 3,
+                                                    [{"exercise_id": "Plank", "sets": 1, "reps": 1}])
+    asyncio.run(go())
+
+
 def test_measurement_partial_upsert_keeps_other_fields():
     async def go():
         async with throwaway_repo() as (repo, uid, _pool):

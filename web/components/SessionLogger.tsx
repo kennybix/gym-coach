@@ -369,7 +369,7 @@ function Header({ online, queued }: { online: boolean; queued: number }) {
       </div>
       <div className="flex items-center gap-1.5">
         <Link href="/history" className="btn btn-ghost h-9 px-3 text-xs">History</Link>
-        <Link href="/program" className="btn btn-ghost h-9 px-3 text-xs">Edit</Link>
+        <Link href="/programs" className="btn btn-ghost h-9 px-3 text-xs">Programs</Link>
         <StatusChip online={online} queued={queued} />
       </div>
     </header>

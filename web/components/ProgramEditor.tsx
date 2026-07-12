@@ -1,7 +1,8 @@
 "use client";
-/* Edit the active program: add (multi-select), reorder, retarget sets×reps, remove.
-   Saves via POST /api/program, which REPLACES the active program (old versions kept
-   inactive for history). Reachable from Today and Setup. */
+/* Edit ONE program from the library: add (multi-select), reorder, retarget sets×reps, remove.
+   Loads /api/programs/{id} and saves via /api/programs/update — in place, never touching the
+   rest of the library (the legacy replace-all POST /api/program deactivated every other
+   program, which silently paused parallel routines). Reached from My Programs. */
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiGet, apiPost, configured } from "@/lib/api";
@@ -13,11 +14,13 @@ type Picked = {
   category?: string | null; image_urls?: string[];
   sets?: number; reps?: number; // undefined for cardio (logged by time/distance)
 };
-type Slot = { exercise_id: string; name: string; equipment: string; category?: string | null; image_urls?: string[]; sets: number | null; reps: number | null };
-type TodayResp = { slots: Slot[]; program: { name: string; sessions_per_week: number } | null };
+type ProgramDetail = {
+  program_id: string; name: string; goal: string | null; sessions_per_week: number;
+  exercises: { exercise_id: string; name: string; equipment: string; category: string | null; image_urls: string[]; sets: number | null; reps: number | null }[];
+};
 const isCardio = (p: { category?: string | null }) => p.category === "cardio";
 
-export default function ProgramEditor() {
+export default function ProgramEditor({ programId }: { programId: string }) {
   const router = useRouter();
   const [picked, setPicked] = useState<Picked[]>([]);
   const [perWeek, setPerWeek] = useState(3);
@@ -31,10 +34,10 @@ export default function ProgramEditor() {
       setReady(true);
       return;
     }
-    apiGet<TodayResp>("/api/program/today")
+    apiGet<ProgramDetail>(`/api/programs/${programId}`)
       .then((d) => {
         setPicked(
-          d.slots.map((s) => ({
+          d.exercises.map((s) => ({
             exercise_id: s.exercise_id,
             name: s.name,
             equipment: s.equipment,
@@ -44,14 +47,12 @@ export default function ProgramEditor() {
             reps: s.category === "cardio" ? undefined : (s.reps ?? 8),
           }))
         );
-        if (d.program) {
-          setPerWeek(d.program.sessions_per_week);
-          setName(d.program.name);
-        }
+        setPerWeek(d.sessions_per_week);
+        setName(d.name);
       })
-      .catch(() => {})
+      .catch(() => setError("Couldn't load this program."))
       .finally(() => setReady(true));
-  }, []);
+  }, [programId]);
 
   const add = (r: CatalogRow) =>
     setPicked((p) =>
@@ -81,14 +82,15 @@ export default function ProgramEditor() {
     setBusy(true);
     setError(null);
     try {
-      await apiPost("/api/program", {
+      await apiPost("/api/programs/update", {
+        program_id: programId,
         name,
         sessions_per_week: perWeek,
         exercises: picked.map((p) =>
           isCardio(p) ? { exercise_id: p.exercise_id } : { exercise_id: p.exercise_id, sets: p.sets, reps: p.reps }
         ),
       });
-      router.push("/");
+      router.push("/programs");
     } catch {
       setError("Couldn't save — check your connection and token.");
       setBusy(false);
@@ -100,11 +102,11 @@ export default function ProgramEditor() {
   return (
     <div className="space-y-5 pb-4">
       <header className="flex items-center justify-between rise">
-        <div>
-          <p className="eyebrow">Edit</p>
-          <h1 className="font-display text-[28px] font-bold mt-1.5">Program</h1>
+        <div className="min-w-0">
+          <p className="eyebrow">Edit program</p>
+          <h1 className="font-display text-[28px] font-bold mt-1.5 truncate">{name}</h1>
         </div>
-        <button onClick={() => router.push("/")} className="btn btn-ghost h-9 px-4 text-sm">Cancel</button>
+        <button onClick={() => router.push("/programs")} className="btn btn-ghost h-9 px-4 text-sm shrink-0">Cancel</button>
       </header>
 
       <div className="card p-5 rise space-y-3">

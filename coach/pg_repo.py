@@ -1202,6 +1202,52 @@ class PostgresCoachRepo:
             program_id, user_id,
         )
 
+    async def get_program_detail(self, user_id: str, program_id: str) -> Optional[dict]:
+        """One program's meta + exercises (with catalog names/media), for per-program editing."""
+        meta = await self._pool.fetchrow(
+            "select name, goal, sessions_per_week from programs where program_id = $1::uuid and user_id = $2::uuid",
+            program_id, user_id,
+        )
+        if not meta:
+            return None
+        rows = await self._pool.fetch(
+            """select exercise_id, sets, reps from program_exercises
+               where program_id = $1::uuid order by position""",
+            program_id,
+        )
+        exercises = []
+        for r in rows:
+            d = self._catalog.detail_of(r["exercise_id"])
+            exercises.append({"exercise_id": r["exercise_id"], "name": d["name"], "equipment": d["equipment"],
+                              "category": d["category"], "image_urls": d["image_urls"],
+                              "sets": r["sets"], "reps": r["reps"]})
+        return {"program_id": program_id, "name": meta["name"], "goal": meta["goal"],
+                "sessions_per_week": meta["sessions_per_week"], "exercises": exercises}
+
+    async def update_program_exercises(self, user_id: str, program_id: str, name: str,
+                                       sessions_per_week: int, exercises: list[dict]) -> None:
+        """Replace ONE program's exercises/meta in place — other programs, its schedule, goal and
+        active flag are untouched (unlike legacy create_program, which deactivates everything)."""
+        async with self._pool.acquire() as con:
+            async with con.transaction():
+                owned = await con.fetchval(
+                    "select 1 from programs where program_id = $1::uuid and user_id = $2::uuid",
+                    program_id, user_id,
+                )
+                if not owned:
+                    raise PermissionError(f"program {program_id!r} not found for user {user_id!r}")
+                await con.execute(
+                    "update programs set name = $3, sessions_per_week = $4 where program_id = $1::uuid and user_id = $2::uuid",
+                    program_id, user_id, name, sessions_per_week,
+                )
+                await con.execute("delete from program_exercises where program_id = $1::uuid", program_id)
+                for i, e in enumerate(exercises):
+                    await con.execute(
+                        """insert into program_exercises (program_id, exercise_id, position, sets, reps)
+                           values ($1, $2, $3, $4, $5)""",
+                        program_id, e["exercise_id"], i, e.get("sets"), e.get("reps"),
+                    )
+
     async def delete_inactive_programs(self, user_id: str) -> int:
         """Clear paused/old (inactive) programs. Safe for history — sessions.program_id is
         ON DELETE SET NULL, so logged workouts are kept (just unlinked)."""

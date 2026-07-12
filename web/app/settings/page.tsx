@@ -57,15 +57,7 @@ export default function SettingsPage() {
       <Link href="/programs" className="card p-4 rise flex items-center justify-between active:bg-panel2">
         <span>
           <span className="block text-sm font-medium">My programs</span>
-          <span className="block text-dim text-xs mt-0.5">Choose a template or design one for a goal · run several at once</span>
-        </span>
-        <span className="text-dim text-xl">›</span>
-      </Link>
-
-      <Link href="/program" className="card p-4 rise flex items-center justify-between active:bg-panel2">
-        <span>
-          <span className="block text-sm font-medium">Edit program</span>
-          <span className="block text-dim text-xs mt-0.5">Add, reorder, or retarget your exercises</span>
+          <span className="block text-dim text-xs mt-0.5">Add, edit, schedule — templates or design one for a goal</span>
         </span>
         <span className="text-dim text-xl">›</span>
       </Link>

@@ -803,3 +803,32 @@ async def programs_delete(body: ProgramDeleteIn, user_id: str = Depends(get_curr
 @router.post("/programs/clear-inactive")
 async def programs_clear_inactive(user_id: str = Depends(get_current_user_id)):
     return {"status": "ok", "deleted": await _repo.delete_inactive_programs(user_id)}
+
+
+@router.get("/programs/{program_id}")
+async def program_detail(program_id: str, user_id: str = Depends(get_current_user_id)):
+    d = await _repo.get_program_detail(user_id, program_id)
+    if not d:
+        raise HTTPException(404, "program not found")
+    return d
+
+
+class ProgramUpdateIn(BaseModel):
+    program_id: str
+    name: str
+    sessions_per_week: int = Field(ge=1, le=7)
+    exercises: list[ProgramExerciseIn] = Field(min_length=1)
+
+
+@router.post("/programs/update")
+async def program_update(body: ProgramUpdateIn, user_id: str = Depends(get_current_user_id)):
+    """Edit ONE program in place — never touches the rest of the library (the legacy
+    POST /api/program replaces the whole active set; it remains only for onboarding)."""
+    try:
+        await _repo.update_program_exercises(
+            user_id, body.program_id, body.name, body.sessions_per_week,
+            [e.model_dump() for e in body.exercises],
+        )
+    except PermissionError:
+        raise HTTPException(404, "program not found")
+    return {"status": "ok"}
