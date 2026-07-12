@@ -6,6 +6,7 @@ import ProfileEditor from "@/components/ProfileEditor";
 import QueueStatus from "@/components/QueueStatus";
 import RemindersCard from "@/components/RemindersCard";
 import { isNative, syncHealthConnect } from "@/lib/health";
+import { tokenExpiry } from "@/lib/api";
 
 export default function SettingsPage() {
   const [base, setBase] = useState("");
@@ -15,10 +16,13 @@ export default function SettingsPage() {
   const [hcBusy, setHcBusy] = useState(false);
   const [hcMsg, setHcMsg] = useState<string | null>(null);
 
+  const [exp, setExp] = useState<Date | null>(null);
+
   useEffect(() => {
     setBase(localStorage.getItem("coach_api_base") || "");
     setTok(localStorage.getItem("coach_token") || "");
     setNative(isNative());
+    setExp(tokenExpiry());
   }, []);
 
   const syncHealth = async () => {
@@ -40,6 +44,7 @@ export default function SettingsPage() {
   const save = () => {
     localStorage.setItem("coach_api_base", base.trim());
     localStorage.setItem("coach_token", tok.trim());
+    setExp(tokenExpiry());
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
@@ -99,6 +104,13 @@ export default function SettingsPage() {
         <button onClick={save} className="btn btn-primary w-full h-12">
           {saved ? "Saved ✓" : "Save"}
         </button>
+        {exp && (
+          <p className={`text-xs ${exp.getTime() - Date.now() < 30 * 86400e3 ? "text-alert" : "text-dim"}`}>
+            Token valid until {exp.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+            {exp.getTime() < Date.now() ? " — expired, paste a fresh one" :
+              exp.getTime() - Date.now() < 30 * 86400e3 ? " — expiring soon, mint a fresh one" : ""}
+          </p>
+        )}
       </div>
 
       {native && (

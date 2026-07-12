@@ -16,11 +16,22 @@ export function configured(): boolean {
   return Boolean(token());
 }
 
+/* A 401 while a token IS configured means it expired (they're minted with a 1-year exp) or was
+   revoked — without this signal the app just silently stops saving one day. AuthBanner listens. */
+function noteAuthFailure(status: number) {
+  if (status === 401 && typeof window !== "undefined" && token()) {
+    window.dispatchEvent(new CustomEvent("coach:auth-expired"));
+  }
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${apiBase()}${path}`, {
     headers: { Authorization: `Bearer ${token()}` },
   });
-  if (!res.ok) throw new Error(`GET ${path} -> ${res.status}`);
+  if (!res.ok) {
+    noteAuthFailure(res.status);
+    throw new Error(`GET ${path} -> ${res.status}`);
+  }
   return res.json();
 }
 
@@ -33,8 +44,23 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`POST ${path} -> ${res.status}`);
+  if (!res.ok) {
+    noteAuthFailure(res.status);
+    throw new Error(`POST ${path} -> ${res.status}`);
+  }
   return res.json();
+}
+
+/* Decode the JWT's exp (client-side, display-only — verification happens server-side). */
+export function tokenExpiry(): Date | null {
+  try {
+    const t = token();
+    if (!t) return null;
+    const payload = JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload.exp ? new Date(payload.exp * 1000) : null;
+  } catch {
+    return null;
+  }
 }
 
 export type ProgramSlot = {

@@ -5,6 +5,7 @@ import DevAutoConfig from "@/components/DevAutoConfig";
 import NavBar from "@/components/NavBar";
 import NativeShell from "@/components/NativeShell";
 import QueueSync from "@/components/QueueSync";
+import AuthBanner from "@/components/AuthBanner";
 
 export const metadata: Metadata = {
   title: "Gym Coach",
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <DevAutoConfig />
         <NativeShell />
         <QueueSync />
+        <AuthBanner />
         {/* Top/bottom padding fold in the safe-area insets (0 in a normal browser, the status-bar
             / gesture-bar heights in the native WebView), so the header clears the clock and content
             clears the nav bar. */}
