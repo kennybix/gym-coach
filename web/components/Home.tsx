@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { configured, homeData, type HomeData, type ProgramSlot } from "@/lib/api";
+import { apiGet, configured, homeData, type HomeData, type ProgramSlot } from "@/lib/api";
 import { enqueue, subscribeQueue } from "@/lib/queue";
 import CoachNote from "./CoachNote";
 import DescribeWorkout from "./DescribeWorkout";
@@ -63,8 +63,14 @@ export default function Home() {
   useEffect(() => {
     load();
     setSession(loadSession());
+    // first run: nobody else routes a fresh token to the wizard
+    if (configured() && localStorage.getItem("coach_onboarded") !== "1") {
+      apiGet<{ onboarded: boolean }>("/api/onboarding/status")
+        .then((d) => { if (d.onboarded) localStorage.setItem("coach_onboarded", "1"); else router.replace("/onboarding"); })
+        .catch(() => {});
+    }
     return subscribeQueue(setQueued);
-  }, [load]);
+  }, [load, router]);
 
   const start = useCallback(() => {
     const s: ActiveSession = { id: crypto.randomUUID(), startedAt: new Date().toISOString(), logged: [], adhoc: [] };

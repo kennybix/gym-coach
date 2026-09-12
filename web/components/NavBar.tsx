@@ -24,6 +24,7 @@ const TABS: Tab[] = [
 
 export default function NavBar() {
   const path = usePathname();
+  if (path.startsWith("/onboarding")) return null;
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-line bg-ink/85 backdrop-blur-xl">
       <div

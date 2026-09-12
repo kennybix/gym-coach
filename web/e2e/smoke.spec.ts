@@ -76,6 +76,15 @@ test("Programs lists the library and opens the per-program editor", async ({ pag
   await expect(page.getByRole("button", { name: /Save/ })).toBeVisible();
 });
 
+test("Onboarding wizard renders and steps without saving", async ({ page }) => {
+  await page.goto("/onboarding");
+  await expect(page.getByText("Choose a look")).toBeVisible();
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await expect(page.getByRole("heading", { name: "About you" })).toBeVisible();
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByRole("heading", { name: "Your goal" })).toBeVisible();
+});
+
 test("Setup shows token field + expiry", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByText("Signed in")).toBeVisible();
