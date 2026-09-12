@@ -26,7 +26,7 @@ bash deploy/build-apk.sh
 > **The APK build clobbers the served site.** `build-apk.sh` runs `NATIVE_BUILD=1 next build`,
 > which replaces `.next` with a static export that has the tailnet API URL baked in. Always
 > re-run `npm run build` and restart `coach-frontend` afterwards, or the PWA at
-> `https://gym-coach.taile8b1de.ts.net` becomes that export.
+> `https://gym-coach.<your-tailnet>.ts.net` becomes that export.
 Toolchain (one-time): Android SDK at `~/Android` (cmdline-tools + `platforms;android-36` +
 `build-tools;36.0.0`), and a **full JDK 21** at `~/jdk` (the system Java is a JRE — no `javac`).
 
@@ -37,7 +37,7 @@ bumped to **1.9.25** with **jvmTarget 17** (captured in `web/patches/` via patch
 ## Sideload onto the phone
 1. `(cd web && npm run build) && systemctl --user restart coach-frontend` — serves the APK
    (Next serves `public/` only for files present at build time).
-2. On the S26+ (Tailscale on): open **https://gym-coach.taile8b1de.ts.net/gym-coach.apk**, let
+2. On the S26+ (Tailscale on): open **https://gym-coach.<your-tailnet>.ts.net/gym-coach.apk**, let
    Chrome download it, tap to install (allow "install unknown apps" once).
 3. Open the app → **Setup → Sync from Health Connect** → grant the weight/BP/HR read permissions.
 

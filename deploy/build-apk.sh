@@ -10,6 +10,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/../web"
 
+# The APK talks to the backend over the network, so the build needs the URL the app is served
+# from. Keep it in .env (gitignored) rather than committed, so a clone doesn't ship your host.
+if [ -f ../.env ]; then set -a; . ../.env; set +a; fi
+: "${COACH_PUBLIC_URL:?set COACH_PUBLIC_URL in .env, e.g. https://gym-coach.<your-tailnet>.ts.net}"
+
 export ANDROID_HOME="$HOME/Android" ANDROID_SDK_ROOT="$HOME/Android"
 JDK="$(find "$HOME/jdk" -maxdepth 1 -name 'jdk-21*' -type d | head -1)"
 [ -n "$JDK" ] || { echo "Need a full JDK 21 in ~/jdk (download Temurin 21)"; exit 1; }
@@ -24,4 +29,4 @@ cp android/app/build/outputs/apk/debug/app-debug.apk public/gym-coach.apk
 echo
 echo "APK built: web/android/app/build/outputs/apk/debug/app-debug.apk"
 echo "To serve it for sideloading:  (cd web && npm run build) && systemctl --user restart coach-frontend"
-echo "Then on the phone (Tailscale on): download https://gym-coach.taile8b1de.ts.net/gym-coach.apk"
+echo "Then on the phone (Tailscale on): download $COACH_PUBLIC_URL/gym-coach.apk"

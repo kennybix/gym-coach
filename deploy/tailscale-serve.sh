@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 # DEPRECATED (2026-06-08). This script serves the gym from the MAIN tailscaled
-# node (quantoptimus.<tailnet>.ts.net). That mapping is retired: a node can hold
+# node (the machine's own tailnet name). That mapping is retired: a node can hold
 # only one serve config, so sharing it with the sibling `mynah` app was fragile
 # — and `tailscale serve reset` below would take that app down.
 #
@@ -32,7 +32,7 @@ echo
 echo "Serving on your tailnet:"
 tailscale serve status
 echo
-echo "Open on any tailnet device:  https://quantoptimus.taile8b1de.ts.net"
+echo "Open on any tailnet device:  https://<host>.<your-tailnet>.ts.net"
 
 # To make it PUBLIC instead (anyone with the URL — add an auth layer first!):
 #   sudo tailscale funnel --bg 443

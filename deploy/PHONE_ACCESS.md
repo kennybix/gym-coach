@@ -4,7 +4,7 @@ The whole app runs on this machine (the LLM is bolted here via the CLI proxy). T
 **Serve** exposes it to **your tailnet only** over HTTPS — private, no public internet, no
 droplet, no DNS. Your phone reaches it whenever Tailscale is on.
 
-**App URL:** `https://gym-coach.taile8b1de.ts.net`  (served from a dedicated
+**App URL:** `https://gym-coach.<your-tailnet>.ts.net`  (served from a dedicated
 Tailscale node — `gym-coach-tailscaled` + `gym-coach-serve` units, mirroring mynah)
 
 Already done (app side, verified):
@@ -32,13 +32,13 @@ systemctl --user enable --now gym-coach-serve.service
 tailscale --socket=$SOCK serve status                      # expect :3010 on the gym-coach host
 ```
 
-You should see `https://gym-coach.taile8b1de.ts.net → http://127.0.0.1:3010`.
+You should see `https://gym-coach.<your-tailnet>.ts.net → http://127.0.0.1:3010`.
 (`deploy/tailscale-serve.sh` is the retired shared-node version — don't run it; it would reset
 the other app's serve config.)
 
 ### 3. On the S26+
-1. Install **Tailscale** from the Play Store, sign in as **oyetundedamilare@gmail.com**, toggle it **on**.
-2. Open **`https://gym-coach.taile8b1de.ts.net`** in Chrome.
+1. Install **Tailscale** from the Play Store, sign in with **the same account as this machine**, toggle it **on**.
+2. Open **`https://gym-coach.<your-tailnet>.ts.net`** in Chrome.
 3. Tap the **gear** on Home → **Signed in** → paste your **bearer token** (below) → **Save**.
    (Leave "Server URL" blank — it uses the site automatically.)
 4. Chrome menu → **Add to Home screen** to install the PWA. Open it from the icon —
@@ -46,9 +46,11 @@ the other app's serve config.)
 5. First run walks you through a five-step wizard; it opens by letting you pick a **look**
    (Volt, Paper, Ember, Glacier, Mono, or Auto — changeable any time under Setup → Look).
 
-**Your token** (1-year, user with your existing data):
-```
-<paste your token — mint with: SUPABASE_JWT_SECRET=... python mint_token.py 11111111-1111-1111-1111-111111111111>
+**Your token** — mint one on this machine and paste it into the app; never commit it, and
+never screenshot the Setup screen with it visible:
+```bash
+set -a; . ./.env; set +a
+python mint_token.py <your-user-uuid>
 ```
 
 ## Or install the Android app
@@ -56,7 +58,7 @@ the other app's serve config.)
 The PWA covers everything except **Health Connect import** and **local notifications**, which
 need the native shell. To sideload it: `bash deploy/build-apk.sh`, restore the server build
 (`(cd web && npm run build) && systemctl --user restart coach-frontend`), then download
-`https://gym-coach.taile8b1de.ts.net/gym-coach.apk` on the phone. Details:
+`https://gym-coach.<your-tailnet>.ts.net/gym-coach.apk` on the phone. Details:
 [`ANDROID_APP.md`](ANDROID_APP.md). After installing, run [`DEVICE_SMOKE.md`](DEVICE_SMOKE.md).
 
 ## Notes

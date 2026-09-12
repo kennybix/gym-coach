@@ -5,7 +5,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "build:native": "NATIVE_BUILD=1 NEXT_PUBLIC_API_URL=https://gym-coach.taile8b1de.ts.net next build",
+    "build:native": "NATIVE_BUILD=1 NEXT_PUBLIC_API_URL=${COACH_PUBLIC_URL:?set COACH_PUBLIC_URL to the URL the app is served from, e.g. https://gym-coach.your-tailnet.ts.net} next build",
     "native:sync": "npm run build:native && npx cap sync android",
     "postinstall": "patch-package",
     "test": "vitest run",

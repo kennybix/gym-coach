@@ -83,9 +83,10 @@ pip install -r requirements.txt
 ./dev_up.sh                         # creates role/db, then runs scripts/migrate.sh (tracked)
 
 # 3. Env — see .env.example; on this machine `.env` is already filled in:
-set -a; . ./.env; set +a            # COACH_DB_URI, COACH_SEED_DIR, SUPABASE_JWT_SECRET,
+set -a; . ./.env; set +a            # COACH_DB_URI, COACH_SEED_DIR, SUPABASE_JWT_SECRET (required),
                                     # COACH_MODEL + OPENAI_BASE_URL/KEY (the CLI proxy),
-                                    # COACH_EMBED_* + EMBED_DIM (the LiteLLM gateway)
+                                    # COACH_EMBED_* + EMBED_DIM (the LiteLLM gateway),
+                                    # COACH_PUBLIC_URL (the served URL; used to build the APK)
 
 # 4. Run (ports on this machine: backend 8010, frontend 3010 — 8000/3000 are taken)
 uvicorn coach.service:app --port 8010
@@ -117,6 +118,13 @@ structured path fails through the OpenAI shim.
   touch the DB. Keep writes unreachable from the model.
 - **`user_id` comes only from the verified JWT** (`auth.get_current_user_id`), never a request
   body or tool argument. Tools read it from `RunnableConfig`.
+- **Auth fails closed.** `SUPABASE_JWT_SECRET` is required: `auth.require_jwt_secret()` runs in
+  the service lifespan and `get_current_user_id` refuses to verify without it. Never restore a
+  default/empty secret — PyJWT will happily validate tokens signed with `""`, which is a total
+  auth bypass. Covered by `coach/tests/test_auth.py`; keep those tests passing.
+- **No credential ever enters the repo.** Tokens are minted locally and pasted on the device;
+  don't commit one, print one into a doc, or screenshot the Setup screen with one visible.
+  (A token leaked this way once, via a README screenshot — the fix was rotating the secret.)
 - **`targets` is append-only** (DB trigger, migration 003). Express a change by inserting a new
   row with a rationale; never UPDATE/DELETE history. (Test fixtures that must delete a throwaway
   user suspend the trigger inside one transaction — product code never does.)
@@ -174,8 +182,8 @@ This is a health-adjacent product. These are deliberate and must be preserved:
 
 ## Current status
 
-**Live and running** on this machine (`quantoptimus`) as systemd user services, served to the
-user's Android phone over Tailscale at `https://gym-coach.taile8b1de.ts.net` (tailnet-only
+**Live and running** on the owner's Linux desktop as systemd user services, served to their
+Android phone over Tailscale at `https://gym-coach.<your-tailnet>.ts.net` (tailnet-only
 HTTPS) as a PWA and a sideloaded Capacitor APK. Coach runs on **GPT-5.5 via the local CLI
 proxy**; embeddings via a **LiteLLM→Ollama** gateway; RAG corpus populated (257 chunks).
 Restart-resilient (`Restart=always`, linger on). All suites green: 98 pytest, 5 Vitest,

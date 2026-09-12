@@ -1,7 +1,7 @@
 # Gym Coach — System Overview (for humans and agents)
 
 A single-user weight-loss training PWA with an AI coach. **The entire app runs on one Linux
-machine** (`quantoptimus`, the user's desktop) and is served to the user's phone over
+machine** (the owner's Linux desktop) and is served to their phone over
 **Tailscale** with HTTPS. This document is the hand-off: read it to understand and operate
 the whole system without rediscovering it.
 
@@ -27,7 +27,7 @@ off/asleep, the app is down (acceptable — it's a personal tool, and the machin
 
 ```
  Samsung S26+ (Tailscale ON)
-        │  https://gym-coach.taile8b1de.ts.net   (tailnet-only, real TLS)
+        │  https://gym-coach.<your-tailnet>.ts.net   (tailnet-only, real TLS)
         ▼
  tailscaled  ──►  `tailscale serve`  (root → 127.0.0.1:3010)
         ▼
@@ -115,7 +115,7 @@ fresh DB end to end.
 
 ## 6. Phone access (Tailscale Serve)
 
-- **URL:** `https://gym-coach.taile8b1de.ts.net` — **tailnet-only** (Serve, *not* Funnel),
+- **URL:** `https://gym-coach.<your-tailnet>.ts.net` — **tailnet-only** (Serve, *not* Funnel),
   so nothing is public; the user's signed-in devices are the gate, the JWT is the data auth.
 - Served from its **own dedicated userspace tailscaled node** (`gym-coach-tailscaled.service`,
   state in `~/.local/share/tailscale-gym-coach/`), so this app owns its hostname and serve
@@ -134,7 +134,7 @@ fresh DB end to end.
   for any served build. `apiBase()` returns same-origin (relative) so the Setup "API URL" is
   optional. Mint a token: `SUPABASE_JWT_SECRET=... python mint_token.py <uuid>`.
 - To go **public** later (share beyond the tailnet): custom domain via the droplet
-  (`gym.quantoptimus.com` → droplet nginx → Tailscale → this machine), or `tailscale funnel`
+  (`gym.example.com` → droplet nginx → Tailscale → this machine), or `tailscale funnel`
   — **add an auth layer first** (e.g. nginx basic-auth).
 
 ---
@@ -248,7 +248,10 @@ design-program,parse-workout,parse-food-photo,photo-note,compare-photos}`.
 - Vitals: coach comments freely (operator choice) with a prompt-level nudge to seek care for
   clearly dangerous readings; **no hard vitals guardrail** (flagged for review).
 - Auth: every endpoint requires a verified JWT (`coach/auth.py`); `user_id` comes only from the
-  token, never a request body.
+  token, never a request body. **The secret is mandatory** — the service refuses to start
+  without `SUPABASE_JWT_SECRET`, because verifying against an empty secret would authenticate
+  anyone. Tokens are long-lived and individually irrevocable; rotating the secret is the only
+  revocation (it invalidates every device, so re-paste on the phone afterwards).
 
 ---
 

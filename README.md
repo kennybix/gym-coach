@@ -6,6 +6,16 @@ target from a deterministic energy-balance engine, reviews every week, and can n
 your data without passing a safety gate. It runs entirely on one machine and reaches your
 phone privately over Tailscale — as an installable PWA or a sideloaded Android app.
 
+> [!IMPORTANT]
+> **Not medical advice, and not clinically reviewed.** This is one person's project, built for
+> their own use. It estimates calorie targets from your logs. The thresholds are aligned to
+> public CDC and NHS guidance and the safety rules live in code rather than in a prompt, but
+> **no clinician has signed off on any of it** (see
+> [`deploy/SAFETY_REVIEW.md`](deploy/SAFETY_REVIEW.md)). Don't use it to make decisions about
+> your health without talking to a professional, and don't deploy it for anyone else without a
+> qualified review first. If you have a history of disordered eating, note that the app will
+> disable automated calorie targets when you say so during setup.
+
 <table>
   <tr>
     <td align="center"><img src="images/home.png" width="155"><br><sub><b>Home</b><br>today's workout · quick logs</sub></td>
@@ -117,6 +127,8 @@ This is health-adjacent software, so the model is deliberately not in charge.
 pip install -r requirements.txt
 ./dev_up.sh                          # Postgres 16 + pgvector, creates coachdb, runs migrations
 cp .env.example .env                 # COACH_DB_URI, SUPABASE_JWT_SECRET, and the LLM env
+python -c "import secrets; print(secrets.token_hex(32))"   # -> SUPABASE_JWT_SECRET (required;
+                                     # the service refuses to start without one)
 set -a; . ./.env; set +a
 
 uvicorn coach.service:app --port 8010                   # backend
@@ -159,10 +171,23 @@ COACH_DB_URI=... COACH_SEED_DIR=... python -m coach.e2e_test     # full slice, s
 
 CI runs pytest, Vitest and a production `next build` on every push.
 
-## Safety and licensing
+## Running it yourself
 
-Thresholds are **evidence-aligned** to CDC and NHS guidance and documented in code, but a
-**clinician must sign off** before this is used by anyone but its author — see
-[`deploy/SAFETY_REVIEW.md`](deploy/SAFETY_REVIEW.md). Exercise catalog from
-[free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain); food data from
-Open Food Facts (ODbL). Personal project — review licensing before any public distribution.
+It is built to run on **one machine you control**, reachable over a private network. There is
+no multi-tenant isolation beyond the JWT boundary and no rate limiting, so don't put it on the
+open internet without an authenticating proxy in front. `SUPABASE_JWT_SECRET` is mandatory and
+the service refuses to start without it. See [`SECURITY.md`](SECURITY.md) before you deploy.
+
+## Licence and credits
+
+Code is [MIT](LICENSE). The things it builds on keep their own terms:
+
+| Source | Used for | Terms |
+|---|---|---|
+| [free-exercise-db](https://github.com/yuhonas/free-exercise-db) | the exercise catalog in `seed/` | public domain |
+| [Open Food Facts](https://openfoodfacts.org) | food search and barcode lookup, at runtime | ODbL, attribution required |
+| CDC, NHS, MedlinePlus, OpenStax | the knowledge corpus | public domain / Open Government Licence / CC BY |
+
+The knowledge corpus itself is **not redistributed here** — `seed/rag_sources.json` lists the
+sources with their licences, and the fetch script pulls them at build time, so attribution and
+share-alike obligations stay with the original publishers.

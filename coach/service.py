@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import api as rest_api
-from .auth import get_current_user_id
+from .auth import get_current_user_id, require_jwt_secret
 from . import energy, media
 from .graph import build_coach_graph, summarize_evidence
 from .parse import parse_workout
@@ -43,6 +43,8 @@ _state: dict = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fail closed: without a signing secret every endpoint would accept forged tokens.
+    require_jwt_secret()
     async with AsyncPostgresSaver.from_conn_string(DB_URI) as saver:
         await saver.setup()
         repo = await PostgresCoachRepo.create(DB_URI, SEED_DIR)

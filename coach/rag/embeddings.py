@@ -1,10 +1,11 @@
 """Production embedder for the RAG corpus.
 
-The pipeline's `FakeEmbedder` is for offline tests; real retrieval needs real vectors
-whose width matches the pgvector column (migration 004 = `vector(1536)`). The CLIProxyAPI
-does NOT serve embeddings, so we use the shared **SmartLLMRouter** embeddings path
-(Gemini @ 1536-dim, with cross-provider failover) that the trading_intelligence project
-exposes — the canonical place for provider/failover logic across projects here.
+The pipeline's `FakeEmbedder` is for offline tests; real retrieval needs real vectors whose
+width matches the pgvector column (see migration 004 and `EMBED_DIM`). Subscription-backed
+chat proxies generally do NOT serve embeddings, so the default backend is a local **LiteLLM
+gateway** in front of Ollama. The optional `router` backend defers to an external
+"SmartLLMRouter" module (cross-provider embedding failover) if you happen to have one; point
+`SMART_LLM_ROOT` at the directory containing it. Most deployments want `litellm`.
 
 Interface matches the pipeline's embedder duck-type: `.embed(text) -> list[float]`,
 plus `.embed_documents(texts)` for batched ingestion.
@@ -15,7 +16,7 @@ Config (env):
     COACH_EMBED_MODEL        model name at the gateway (default: embed-default)
     COACH_EMBED_BASE_URL     LiteLLM gateway base (default: http://localhost:4000/v1)
     COACH_EMBED_API_KEY      LiteLLM master key (or OPENAI_API_KEY)
-    SMART_LLM_ROOT           [router backend] dir containing `trading_intelligence`
+    SMART_LLM_ROOT           [router backend] dir containing the SmartLLMRouter module
     SMART_LLM_ENV            [router backend] a .env to load for GEMINI_API_KEY
     GEMINI_API_KEY / GOOGLE_API_KEY   used by the 'gemini' backend / fallback
 """
@@ -26,9 +27,9 @@ import sys
 from pathlib import Path
 from typing import Protocol
 
-DEFAULT_SMART_LLM_ROOT = (
-    "/home/kehinde-oyetunde/Documents/Projects/QuantOptimus/Foundational Data Generation"
-)
+# Optional `router` backend only: the directory containing the external SmartLLMRouter module.
+# No default — set SMART_LLM_ROOT if you use that backend (the default backend is `litellm`).
+DEFAULT_SMART_LLM_ROOT = os.environ.get("SMART_LLM_ROOT", "")
 
 
 class Embedder(Protocol):
