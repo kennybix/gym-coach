@@ -11,7 +11,6 @@ import CatalogSearch, { type CatalogRow } from "./CatalogSearch";
 import DescribeWorkout from "./DescribeWorkout";
 import ExerciseAnimation from "./ExerciseAnimation";
 import ExerciseDetail from "./ExerciseDetail";
-import InsightCard from "./InsightCard";
 import NumField from "./NumField";
 import RestTimer from "./RestTimer";
 
@@ -235,11 +234,9 @@ export default function SessionLogger() {
     <div className="space-y-5">
       <Header online={online} queued={queued} />
 
-      <InsightCard />
-
       {!session ? (
         <button onClick={start} className="btn btn-primary w-full h-16 text-base rise">
-          Start session
+          Start workout
         </button>
       ) : (
         <button onClick={finish} className="btn btn-ghost w-full h-[3.25rem] rise border-volt/40 text-volt">
@@ -365,11 +362,10 @@ function Header({ online, queued }: { online: boolean; queued: number }) {
     <header className="flex items-end justify-between rise">
       <div>
         <p className="eyebrow">{weekday} · {date}</p>
-        <h1 className="font-display text-[28px] font-bold leading-none mt-1.5">Today</h1>
+        <h1 className="t-title mt-1.5">Workout</h1>
       </div>
       <div className="flex items-center gap-1.5">
-        <Link href="/history" className="btn btn-ghost h-9 px-3 text-xs">History</Link>
-        <Link href="/programs" className="btn btn-ghost h-9 px-3 text-xs">Programs</Link>
+        <Link href="/" className="btn btn-ghost h-9 px-3 text-xs">Home</Link>
         <StatusChip online={online} queued={queued} />
       </div>
     </header>
@@ -380,7 +376,7 @@ function StatusChip({ online, queued }: { online: boolean; queued: number }) {
   const label = online ? (queued ? `Syncing ${queued}` : "Synced") : `Offline · ${queued}`;
   return (
     <span className={`chip inline-flex items-center gap-1.5 px-3 py-1.5 text-xs ${online ? "text-dim" : "border-alert/60 text-alert"}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${online ? (queued ? "bg-volt" : "bg-emerald-400") : "bg-alert"}`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${online ? (queued ? "bg-volt" : "bg-good") : "bg-alert"}`} />
       {label}
     </span>
   );
@@ -511,7 +507,7 @@ function SlotCard({
               </button>
             )}
             {pr ? (
-              <span className="chip px-2 py-0.5 text-[10px] font-semibold text-ink bg-volt border-volt shrink-0">PR</span>
+              <span className="chip px-2 py-0.5 text-[10px] font-semibold text-onvolt bg-volt border-volt shrink-0">PR</span>
             ) : done ? (
               <span className="chip px-2 py-0.5 text-[10px] font-semibold text-volt border-volt/40 shrink-0">Done</span>
             ) : null}

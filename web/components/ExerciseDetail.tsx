@@ -52,7 +52,7 @@ export default function ExerciseDetail({
                 <MuscleMap primary={stats.primary_muscles} secondary={stats.secondary_muscles} />
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   {stats.primary_muscles.map((m) => (
-                    <span key={`p${m}`} className="chip px-2.5 py-1 text-[11px] font-semibold text-ink bg-volt border-volt capitalize">{m}</span>
+                    <span key={`p${m}`} className="chip px-2.5 py-1 text-[11px] font-semibold text-onvolt bg-volt border-volt capitalize">{m}</span>
                   ))}
                   {stats.secondary_muscles.map((m) => (
                     <span key={`s${m}`} className="chip px-2.5 py-1 text-[11px] text-dim capitalize">{m}</span>

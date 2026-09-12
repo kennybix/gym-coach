@@ -360,7 +360,7 @@ function Wrap({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={onToggleHistory}
-              className={`btn h-9 px-3.5 text-xs ${historyOpen ? "bg-volt text-ink" : "btn-ghost"}`}
+              className={`btn h-9 px-3.5 text-xs ${historyOpen ? "bg-volt text-onvolt" : "btn-ghost"}`}
             >
               History
             </button>
@@ -393,7 +393,7 @@ function Bubble({ role, text, evidence }: { role: Msg["role"]; text: string; evi
         <div
           className={`break-words px-4 py-2.5 text-sm leading-relaxed ${
             mine
-              ? "bg-volt text-ink rounded-2xl rounded-br-md font-medium"
+              ? "bg-volt text-onvolt rounded-2xl rounded-br-md font-medium"
               : "card rounded-2xl rounded-bl-md text-bone/90"
           }`}
         >

@@ -6,6 +6,7 @@ import NavBar from "@/components/NavBar";
 import NativeShell from "@/components/NativeShell";
 import QueueSync from "@/components/QueueSync";
 import AuthBanner from "@/components/AuthBanner";
+import { NO_FLASH_SCRIPT } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: "Gym Coach",
@@ -30,12 +31,14 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        {/* stamp the chosen look before first paint (see lib/theme.ts) */}
+        <script dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap"
           rel="stylesheet"
         />
       </head>
@@ -51,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main
           className="flex-1 w-full max-w-md mx-auto px-5"
           style={{
-            paddingTop: "calc(1.75rem + env(safe-area-inset-top))",
+            paddingTop: "calc(1.5rem + env(safe-area-inset-top))",
             paddingBottom: "calc(7rem + env(safe-area-inset-bottom))",
           }}
         >

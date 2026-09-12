@@ -315,7 +315,7 @@ function Toggle({ label, sub, on, onToggle }: { label: string; sub: string; on: 
     <button onClick={onToggle} className={`w-full text-left field p-4 flex items-start gap-3 transition-colors ${on ? "border-volt/60" : ""}`}>
       <span className={`mt-0.5 w-5 h-5 shrink-0 rounded-md border flex items-center justify-center ${on ? "bg-volt border-volt" : "border-line"}`}>
         {on && (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a0b0f" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-onvolt)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg>
         )}
       </span>
       <span>

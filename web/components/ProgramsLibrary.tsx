@@ -147,7 +147,7 @@ export default function ProgramsLibrary() {
                   <p className="text-sm font-medium truncate">{p.name}</p>
                   <p className="text-dim text-xs">{p.goal ? `${p.goal} · ` : ""}{p.exercises} exercises · tap to edit</p>
                 </a>
-                <button onClick={() => toggle(p)} className={`chip px-2.5 py-1 text-[11px] font-semibold shrink-0 ${p.is_active ? "text-ink bg-volt border-volt" : "text-dim"}`}>
+                <button onClick={() => toggle(p)} className={`chip px-2.5 py-1 text-[11px] font-semibold shrink-0 ${p.is_active ? "text-onvolt bg-volt border-volt" : "text-dim"}`}>
                   {p.is_active ? "Active" : "Off"}
                 </button>
                 <button onClick={() => remove(p)} aria-label="delete" className="text-dim hover:text-alert px-1 text-lg shrink-0">×</button>
@@ -158,7 +158,7 @@ export default function ProgramsLibrary() {
                     const set = p.scheduled_days.includes(i);
                     return (
                       <button key={i} onClick={() => schedule(p, i)}
-                        className={`w-7 h-7 rounded-md text-[11px] font-semibold transition-colors ${set ? "bg-volt text-ink" : "bg-panel2 text-dim active:text-bone"}`}>
+                        className={`w-7 h-7 rounded-md text-[11px] font-semibold transition-colors ${set ? "bg-volt text-onvolt" : "bg-panel2 text-dim active:text-bone"}`}>
                         {d}
                       </button>
                     );

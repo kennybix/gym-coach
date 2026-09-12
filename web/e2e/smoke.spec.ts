@@ -13,10 +13,24 @@ test.beforeEach(async ({ page }) => {
   }, TOKEN);
 });
 
-test("Today renders the plan and nav", async ({ page }) => {
+test("Home renders today's workout, quick-log tiles and nav", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Start session" })).toBeVisible();
-  await expect(page.getByRole("navigation").getByText("Trends")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Start workout|Continue workout|Start an open session/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Weigh in" })).toBeVisible();
+  await expect(page.getByRole("navigation").getByText("Progress")).toBeVisible();
+});
+
+test("Weigh-in opens as a sheet and closes without saving", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Weigh in" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("Workout screen lists today's exercises", async ({ page }) => {
+  await page.goto("/workout");
+  await expect(page.getByRole("button", { name: /Start workout|Finish workout/ })).toBeVisible();
 });
 
 test("Trends shows weight + measurements", async ({ page }) => {

@@ -7,6 +7,8 @@ import QueueStatus from "@/components/QueueStatus";
 import RemindersCard from "@/components/RemindersCard";
 import { isNative, syncHealthConnect } from "@/lib/health";
 import { tokenExpiry } from "@/lib/api";
+import ThemePicker from "@/components/ThemePicker";
+import PageHeader from "@/components/ui/PageHeader";
 
 export default function SettingsPage() {
   const [base, setBase] = useState("");
@@ -51,7 +53,12 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="font-display text-[28px] font-bold rise">Setup</h1>
+      <PageHeader eyebrow="You · looks · data" title="Setup" />
+
+      <div className="card p-5 rise">
+        <p className="eyebrow mb-3">Look</p>
+        <ThemePicker />
+      </div>
 
       <QueueStatus />
 

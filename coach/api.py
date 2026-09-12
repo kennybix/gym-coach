@@ -43,6 +43,32 @@ async def program_today(user_id: str = Depends(get_current_user_id)):
     return {"date": _now().date().isoformat(), "slots": slots, "program": meta}
 
 
+@router.get("/home")
+async def home(user_id: str = Depends(get_current_user_id)):
+    """Everything the Home screen needs in one round trip: today's plan, the latest weight,
+    this week's effort counts, and the latest vitals reading."""
+    slots = await _repo.get_program_slots(user_id, scheduled_only=True)
+    meta = await _repo.get_active_program_meta(user_id)
+    weight = await _repo.get_latest_weight_kg(user_id)
+    adherence = await _repo.get_adherence(user_id, 7)
+    nutrition = await _repo.get_nutrition_summary(user_id, 7)
+    trend = await _repo.get_weight_trend(user_id, 7)
+    vitals = await _repo.get_vitals(user_id, 1)
+    return {
+        "date": _now().date().isoformat(),
+        "slots": slots,
+        "program": meta,
+        "latest_weight_kg": weight,
+        "week": {
+            "sessions_completed": adherence.sessions_completed,
+            "sessions_prescribed": adherence.sessions_prescribed,
+            "days_logged": nutrition.days_logged,
+            "weighins": trend.n_points,
+        },
+        "latest_vital": vitals[0] if vitals else None,
+    }
+
+
 class SessionStartIn(BaseModel):
     session_id: str  # client-generated uuid
     started_at: Optional[datetime] = None

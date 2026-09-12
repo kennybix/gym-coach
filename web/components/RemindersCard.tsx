@@ -53,7 +53,7 @@ export default function RemindersCard() {
               className="field h-8 px-2 text-xs tnum mt-1.5 outline-none disabled:opacity-50"
             />
           </div>
-          <button onClick={() => toggle(r.id)} className={`chip px-2.5 py-1 text-[11px] font-semibold shrink-0 ${r.enabled ? "text-ink bg-volt border-volt" : "text-dim"}`}>
+          <button onClick={() => toggle(r.id)} className={`chip px-2.5 py-1 text-[11px] font-semibold shrink-0 ${r.enabled ? "text-onvolt bg-volt border-volt" : "text-dim"}`}>
             {r.enabled ? "On" : "Off"}
           </button>
         </div>

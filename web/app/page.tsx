@@ -1,5 +1,5 @@
-import SessionLogger from "@/components/SessionLogger";
+import Home from "@/components/Home";
 
-export default function TodayPage() {
-  return <SessionLogger />;
+export default function HomePage() {
+  return <Home />;
 }

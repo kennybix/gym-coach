@@ -17,7 +17,7 @@ INSIGHT_PROMPT = (
     "streak, training adherence, a vitals trend, or a body-measurement change. If measurements "
     "show a waist/belly drop while body weight holds steady, that's recomposition (fat down, "
     "muscle kept) — a great thing to surface, stated factually, never as appearance commentary. "
-    "Max 2 sentences, about 30 words. Ground "
+    "ONE sentence, at most 22 words — it renders as a single line on the home screen. Ground "
     "every number in the data; never invent. If the data is too thin to say anything real, "
     "give a gentle nudge to log consistently. Not medical advice; if a vitals reading is "
     "clearly concerning, suggest a professional check rather than interpreting it. No "

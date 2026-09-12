@@ -261,3 +261,14 @@ export async function coachLatestReview(): Promise<Review> {
     return null;
   }
 }
+
+/* ---- home ---- */
+export type HomeData = {
+  date: string;
+  slots: ProgramSlot[];
+  program: { name?: string } | null;
+  latest_weight_kg: number | null;
+  week: { sessions_completed: number; sessions_prescribed: number; days_logged: number; weighins: number };
+  latest_vital: { recorded_at: string; systolic: number | null; diastolic: number | null; heart_rate: number | null } | null;
+};
+export const homeData = () => apiGet<HomeData>("/api/home");
