@@ -220,7 +220,7 @@ export default function OnboardingFlow() {
       )}
 
       {step === 4 && draft && (
-        <section className="space-y-4 rise pb-4">
+        <section className="space-y-4 rise pb-20">
           <div className="flex items-center justify-between gap-3">
             <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} aria-label="Program name" className="t-h2 bg-transparent outline-none flex-1 min-w-0 border-b border-transparent focus:border-line" />
             <button onClick={() => setDraft(null)} className="btn btn-quiet h-9 px-2 text-xs shrink-0">Change</button>
@@ -283,7 +283,7 @@ export default function OnboardingFlow() {
       {error && <p className="text-alert text-sm px-1">{error}</p>}
 
       {step < 5 && !(step === 4 && !draft) && (
-        <div className="flex gap-2.5 sticky z-20" style={{ bottom: "calc(70px + env(safe-area-inset-bottom))" }}>
+        <div className="flex gap-2.5 sticky z-20" style={{ bottom: "calc(12px + env(safe-area-inset-bottom))" }}>
           {step > 0 && <button onClick={() => setStep((s) => (s - 1) as Step)} className="btn btn-ghost h-14 px-6">Back</button>}
           <button disabled={!canNext || busy} onClick={next} className="btn btn-primary flex-1 h-14 text-base shadow-lg">
             {step === 4 ? (busy ? "Saving…" : "Finish setup") : step === 0 ? "Let's go" : "Next"}
