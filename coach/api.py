@@ -186,8 +186,10 @@ async def trends(window: int = 30, user_id: str = Depends(get_current_user_id)):
     series = await _repo.get_weight_series(user_id, window)
     energy_balance = await _repo.get_energy_balance(user_id, 7)
     adaptive = await _repo.get_adaptive_estimate(user_id, 28)
+    latest = await _repo.get_latest_weight(user_id)
     return {
         "window_days": window,
+        "latest_weight": latest,
         "goal_weight_kg": profile.goal_weight_kg,
         "weight_series": series,
         "trend": trend.model_dump(),

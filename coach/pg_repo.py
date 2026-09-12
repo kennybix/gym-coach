@@ -481,6 +481,15 @@ class PostgresCoachRepo:
         )
         return float(v) if v is not None else None
 
+    async def get_latest_weight(self, user_id: str) -> Optional[dict]:
+        """Most recent weigh-in regardless of window: {kg, date} or None."""
+        row = await self._pool.fetchrow(
+            """select weight_kg, (recorded_at at time zone 'utc')::date as d from body_metrics
+               where user_id = $1::uuid and weight_kg is not null order by recorded_at desc limit 1""",
+            user_id,
+        )
+        return {"kg": float(row["weight_kg"]), "date": row["d"].isoformat()} if row else None
+
     async def get_activity_energy(self, user_id: str, window_days: int = 7) -> dict:
         """Estimated calories burned from duration-based logs (cardio + sports) over the window,
         MET x bodyweight x time. Estimates, not measurements."""

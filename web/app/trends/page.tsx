@@ -1,5 +1,5 @@
-import TrendsView from "@/components/TrendsView";
+import ProgressView from "@/components/ProgressView";
 
-export default function TrendsPage() {
-  return <TrendsView />;
+export default function ProgressPage() {
+  return <ProgressView />;
 }

@@ -33,17 +33,18 @@ test("Workout screen lists today's exercises", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Start workout|Finish workout/ })).toBeVisible();
 });
 
-test("Trends shows weight + measurements", async ({ page }) => {
+test("Progress shows the weight hero, vitals and body sections", async ({ page }) => {
   await page.goto("/trends");
-  await expect(page.getByText("Weight trend", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("weight-hero")).toBeVisible();
   await expect(page.getByText("Body measurements")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log something" })).toBeVisible();
 });
 
-test("Trends shows the adaptive maintenance card (building or estimate, never a target)", async ({ page }) => {
+test("Progress shows the energy-balance section (building or estimate, never a target)", async ({ page }) => {
   await page.goto("/trends");
   const card = page.getByTestId("adaptive-card");
   await expect(card).toBeVisible();
-  await expect(card.getByText("Maintenance from your own logs")).toBeVisible();
+  await expect(card.getByText("Energy balance")).toBeVisible();
   // the UI must never surface a suggested calorie target (targets come only from onboarding/coach)
   await expect(card).not.toContainText(/target .*\d{3,4} ?kcal/i);
   await page.screenshot({ path: process.env.SHOT || "test-results/trends.png", fullPage: true });

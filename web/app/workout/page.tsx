@@ -1,5 +1,5 @@
-import SessionLogger from "@/components/SessionLogger";
+import WorkoutPlayer from "@/components/WorkoutPlayer";
 
 export default function WorkoutPage() {
-  return <SessionLogger />;
+  return <WorkoutPlayer />;
 }
