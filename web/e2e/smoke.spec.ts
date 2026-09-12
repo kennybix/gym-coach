@@ -25,6 +25,16 @@ test("Trends shows weight + measurements", async ({ page }) => {
   await expect(page.getByText("Body measurements")).toBeVisible();
 });
 
+test("Trends shows the adaptive maintenance card (building or estimate, never a target)", async ({ page }) => {
+  await page.goto("/trends");
+  const card = page.getByTestId("adaptive-card");
+  await expect(card).toBeVisible();
+  await expect(card.getByText("Maintenance from your own logs")).toBeVisible();
+  // the UI must never surface a suggested calorie target (targets come only from onboarding/coach)
+  await expect(card).not.toContainText(/target .*\d{3,4} ?kcal/i);
+  await page.screenshot({ path: process.env.SHOT || "test-results/trends.png", fullPage: true });
+});
+
 test("Fuel shows food search", async ({ page }) => {
   await page.goto("/nutrition");
   await expect(page.getByPlaceholder(/Search foods/)).toBeVisible();

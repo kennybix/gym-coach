@@ -10,6 +10,7 @@ import datetime as dt
 import os
 import uuid
 
+
 import pytest
 
 DSN = os.environ.get("COACH_DB_URI")
@@ -31,7 +32,13 @@ async def throwaway_repo():
     try:
         yield repo, uid, pool
     finally:
-        await pool.execute("delete from profiles where user_id = $1::uuid", uid)  # cascade
+        # cascade-delete the throwaway user; `targets` is append-only (trigger blocks DELETE),
+        # so suspend that trigger for this one transaction — test cleanup only, never product code.
+        async with pool.acquire() as con:
+            async with con.transaction():
+                await con.execute("alter table targets disable trigger trg_targets_append_only")
+                await con.execute("delete from profiles where user_id = $1::uuid", uid)
+                await con.execute("alter table targets enable trigger trg_targets_append_only")
         await pool.close()
 
 
@@ -126,4 +133,38 @@ def test_measurement_partial_upsert_keeps_other_fields():
             m = [x for x in await repo.get_measurements(uid) if x["date"] == "2026-01-01"][0]
             assert m["waist_cm"] == 88 and m["belly_cm"] == 95   # COALESCE preserved belly
             assert await repo.delete_measurement(uid, day) == 1
+    asyncio.run(go())
+
+
+def test_adaptive_estimate_reads_real_series():
+    """Engine over live rows: 28 days of intake + weigh-ins on a straight line must produce a
+    sufficient estimate whose observed maintenance matches the energy-balance arithmetic."""
+    async def go():
+        async with throwaway_repo() as (repo, uid, _pool):
+            # a back-dated target (targets is append-only, so set created_at on insert) so the
+            # engine's cooldown doesn't mask the recommendation
+            await _pool.execute(
+                """insert into targets (user_id, daily_kcal, protein_g, source, rationale, created_at)
+                   values ($1::uuid, 2300, 160, 'onboarding', 'seed', now() - interval '40 days')""", uid)
+            today = dt.date.today()
+            for i in range(28):
+                day = today - dt.timedelta(days=27 - i)
+                await repo.upsert_nutrition_day(uid, day, 2000, 150)
+                if i % 2 == 0:
+                    at = dt.datetime.combine(day, dt.time(8, 0), tzinfo=dt.timezone.utc)
+                    await repo.insert_body_metric(uid, str(uuid.uuid4()), at, round(90 - 0.5 * i / 7, 2))
+            est = await repo.get_adaptive_estimate(uid, 28)
+            assert est.recommendation in ("adjust", "hold"), est
+            assert est.days_logged == 28 and est.n_weighins == 14
+            assert abs(est.observed_maintenance_kcal - 2550) <= 10
+            assert est.suggested_target_kcal is not None
+            # thin data => insufficient, never a number
+            fresh = str(uuid.uuid4())
+            await repo.create_profile(fresh, sex="male", birth_year=1990, height_cm=175,
+                                      activity_level="moderate", goal_weight_kg=75, weekly_rate_kg=0.5, medical_flags=[])
+            try:
+                thin = await repo.get_adaptive_estimate(fresh, 28)
+                assert thin.recommendation == "insufficient" and thin.needs
+            finally:
+                await _pool.execute("delete from profiles where user_id = $1::uuid", fresh)
     asyncio.run(go())

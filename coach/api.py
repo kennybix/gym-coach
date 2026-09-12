@@ -159,6 +159,7 @@ async def trends(window: int = 30, user_id: str = Depends(get_current_user_id)):
     adherence = await _repo.get_adherence(user_id, window)
     series = await _repo.get_weight_series(user_id, window)
     energy_balance = await _repo.get_energy_balance(user_id, 7)
+    adaptive = await _repo.get_adaptive_estimate(user_id, 28)
     return {
         "window_days": window,
         "goal_weight_kg": profile.goal_weight_kg,
@@ -166,6 +167,10 @@ async def trends(window: int = 30, user_id: str = Depends(get_current_user_id)):
         "trend": trend.model_dump(),
         "adherence": adherence.model_dump(),
         "energy": energy_balance,
+        # deterministic adaptive-target engine (coach/adaptive.py). The UI shows the maintenance
+        # estimate + what data is still needed; it never shows a suggested target (targets come
+        # only from onboarding / coach / weekly review).
+        "adaptive": adaptive.model_dump(),
     }
 
 

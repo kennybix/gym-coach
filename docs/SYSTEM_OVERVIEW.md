@@ -156,7 +156,9 @@ Python backend uses the repo `.venv`. Secrets live in `.env` (gitignored).
   in place, add ad-hoc exercises, program editor (`/program`), proactive coach insight card
   (tappable → Coach, rotating focus), workout history (`/history`).
 - **Trends** — adherence bars, weight chart with **tap-a-point to edit/remove**, vitals card
-  (BP + heart rate, many/day, edit/remove, sparklines).
+  (BP + heart rate, many/day, edit/remove, sparklines), energy card incl. the **adaptive
+  maintenance estimate** from the user's own logs (28d; shows confidence + evidence, or exactly what
+  to log next — never a suggested target).
 - **Fuel** — **food-database logging** (Open Food Facts search + **barcode scan** + recent
   foods + servings/grams), per-day edit, macro summary (protein progress; calories shown
   without verdicts — wellbeing-first), streak.
@@ -182,6 +184,13 @@ New REST (beyond the original): `/api/sets/{delete,update}`, `/api/metrics/weigh
   and documented, but **a clinician must still sign** [`deploy/SAFETY_REVIEW.md`](../deploy/SAFETY_REVIEW.md) before launch.
 - Inbound/outbound content screening catches disordered-eating, self-harm, numeric
   extreme-deficit, rapid-loss intent, train-through-injury → supportive redirect.
+- **Adaptive calorie targets are system-owned** (`coach/adaptive.py`): observed maintenance =
+  avg logged intake − weight-slope×7700, blended with Mifflin-St Jeor; requires ≥4 weigh-ins over
+  ≥14d and ≥10 logged days at ≥50% coverage; an observed number <75% of the formula is treated as
+  under-logging → *hold*, never a cut; ±10% max step, 100 kcal dead band, 14-day cooldown, floors.
+  The unattended weekly review writes a target ONLY on the engine's `adjust` verdict (still via
+  `safety.check_target_change`); the LLM's own idea is recorded as `llm_advised_target`, never
+  applied. ED history → engine `disabled`.
 - Vitals: coach comments freely (operator choice) with a prompt-level nudge to seek care for
   clearly dangerous readings; **no hard vitals guardrail** (flagged for review).
 - Auth: every endpoint requires a verified JWT (`coach/auth.py`); `user_id` comes only from the

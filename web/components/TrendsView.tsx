@@ -36,6 +36,19 @@ type Trends = {
     activity_kcal_total: number;
     weight_kg_used: number | null;
   } | null;
+  adaptive?: {
+    window_days: number;
+    recommendation: "disabled" | "insufficient" | "underlogged" | "cooldown" | "hold" | "adjust";
+    days_logged: number;
+    n_weighins: number;
+    span_days: number;
+    log_coverage: number;
+    estimated_maintenance_kcal: number | null;
+    observed_maintenance_kcal: number | null;
+    confidence: "none" | "low" | "medium" | "high";
+    needs: string[];
+    reason: string;
+  } | null;
 };
 
 function todayISO() {
@@ -160,6 +173,38 @@ export default function TrendsView() {
             Rough estimates — your <span className="text-bone/80">weight trend above</span> is the real
             measure of whether things balance out.
           </p>
+          {data.adaptive && data.adaptive.recommendation !== "disabled" && (
+            <div className="mt-3 pt-3 border-t border-white/10" data-testid="adaptive-card">
+              <p className="text-dim text-xs">Maintenance from your own logs · 28 days</p>
+              {data.adaptive.observed_maintenance_kcal != null && data.adaptive.recommendation !== "underlogged" ? (
+                <>
+                  <p className="font-display tnum text-xl font-bold mt-0.5">
+                    ~{data.adaptive.estimated_maintenance_kcal} <span className="text-dim text-xs font-normal">kcal/day · {data.adaptive.confidence} confidence</span>
+                  </p>
+                  <p className="text-dim text-[11px]">
+                    {data.adaptive.days_logged} days of food · {data.adaptive.n_weighins} weigh-ins over {data.adaptive.span_days} days
+                  </p>
+                  <p className="text-dim text-xs mt-1.5 leading-relaxed">
+                    {data.adaptive.recommendation === "adjust"
+                      ? "Your target is due a small calibration — the coach will apply it in your weekly review."
+                      : data.adaptive.recommendation === "cooldown"
+                        ? "Target changed recently; giving it two weeks to show in the trend."
+                        : "Your target already lines up with this. Nothing to change."}
+                  </p>
+                </>
+              ) : data.adaptive.recommendation === "underlogged" ? (
+                <p className="text-dim text-xs mt-1 leading-relaxed">
+                  Logged intake sits well below what your weight trend implies — usually a few unlogged meals.
+                  Log everything for a couple of weeks and this estimate will firm up. Target unchanged.
+                </p>
+              ) : (
+                <p className="text-dim text-xs mt-1 leading-relaxed">
+                  Building. Still needed: {data.adaptive.needs.join(", ")}. Then I can estimate what you
+                  actually burn and keep your target calibrated automatically.
+                </p>
+              )}
+            </div>
+          )}
         </Card>
       )}
 

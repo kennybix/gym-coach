@@ -55,6 +55,20 @@ def build_read_tools(repo: CoachRepo) -> list:
         return json.dumps(await repo.get_vitals_summary(uid, window_days))
 
     @tool
+    async def get_adaptive_target_estimate(config: RunnableConfig) -> str:
+        """The system's deterministic energy-balance estimate over the last 28 days: observed
+        maintenance from logged intake + weight trend, the formula anchor, a confidence level,
+        and a `recommendation` for the calorie target — 'adjust' (with the exact
+        suggested_target_kcal + change_kcal), 'hold', 'cooldown', 'underlogged', 'insufficient'
+        (with `needs` = what's missing), or 'disabled'. ALWAYS call this before discussing or
+        proposing a calorie-target change. If it says 'adjust', propose exactly
+        suggested_target_kcal (keep protein as is) and explain `reason`; otherwise do NOT
+        propose a target change — explain the recommendation instead. Never invent your own
+        maintenance or target number."""
+        uid = config["configurable"]["user_id"]
+        return (await repo.get_adaptive_estimate(uid, 28)).model_dump_json()
+
+    @tool
     async def get_today_plan(config: RunnableConfig) -> str:
         """The active program's exercises with target sets×reps and the system's deterministic
         next-load suggestion per lift (suggested_kg + reason, from the last working set). Use to
@@ -122,7 +136,7 @@ def build_read_tools(repo: CoachRepo) -> list:
 
     return [get_weight_trend, get_adherence, get_nutrition_summary, get_current_targets,
             get_recent_vitals, get_today_plan, get_activity_energy, get_recent_measurements,
-            explain_exercise, get_exercise_consistency]
+            explain_exercise, get_exercise_consistency, get_adaptive_target_estimate]
 
 
 def build_propose_tools(repo: CoachRepo) -> list:

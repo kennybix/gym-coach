@@ -51,7 +51,13 @@ SYSTEM_PROMPT = (
     "results — never invent numbers; call the read tools first. When you cite the weight "
     "trend, respect its `sufficient` flag: if it is false (too few weigh-ins over too short a "
     "span), do NOT state a kg/week rate — say the trend isn't reliable yet and encourage a few "
-    "more weigh-ins. To change a calorie target "
+    "more weigh-ins. Calorie targets are owned by the system's adaptive energy-balance engine: "
+    "before discussing maintenance calories or any calorie-target change, call "
+    "get_adaptive_target_estimate. If its recommendation is 'adjust', propose exactly its "
+    "suggested_target_kcal via propose_target_change (keep protein unchanged) and explain its "
+    "reason; if it is 'hold', 'cooldown', 'underlogged' or 'insufficient', do NOT propose a "
+    "calorie change — explain why and, when it lists `needs`, tell the user exactly what to log. "
+    "Never state a maintenance or target number the tool did not return. To change a calorie target "
     "or training program, call the relevant propose_* tool and do not describe the change as "
     "done until the system confirms it. If the user lacks equipment (e.g. traveling), call "
     "propose_equipment_swap with what they actually have so the program is rebuilt to fit. "
@@ -135,6 +141,21 @@ def _evidence_for(name: str, d: dict) -> Optional[dict]:
         return {"label": "Measurements", "detail": " · ".join(parts)} if parts else None
     if name == "explain_exercise":
         return {"label": "Technique", "detail": g("name")} if g("found") else None
+    if name == "get_adaptive_target_estimate":
+        rec = g("recommendation")
+        if rec == "disabled":
+            return None
+        if rec == "insufficient":
+            return {"label": "Energy balance",
+                    "detail": f"building · {g('days_logged', 0)}d food · {g('n_weighins', 0)} weigh-ins/{g('span_days', 0)}d"}
+        est = g("estimated_maintenance_kcal")
+        parts = [f"~{est} kcal/day maintenance ({g('confidence')})"] if est else []
+        parts.append(f"{g('days_logged', 0)}d food · {g('n_weighins', 0)} weigh-ins/{g('span_days', 0)}d")
+        if rec == "adjust" and g("suggested_target_kcal"):
+            parts.append(f"target {g('current_target_kcal')}→{g('suggested_target_kcal')}")
+        elif rec in ("hold", "cooldown", "underlogged"):
+            parts.append(rec)
+        return {"label": "Energy balance", "detail": " · ".join(parts)}
     if name == "get_exercise_consistency":
         if not g("found"):
             return None

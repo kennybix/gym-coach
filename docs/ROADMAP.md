@@ -102,6 +102,14 @@ coach evidence. Ship in the order below; each item lists acceptance criteria.
 
 # Phase 2 — Kill manual friction + deepen nutrition
 
+**Status (2026-09-12):** all three items shipped — Health Connect sync via the Capacitor Android
+shell (weight/BP/resting HR), **adaptive calorie targets** (`coach/adaptive.py`, 2026-09-12: a
+deterministic energy-balance engine — observed maintenance from logged intake + weight slope,
+blended with the formula anchor, floored/step-capped/dead-banded/cooled-down; the weekly review
+applies ONLY its verdict through the safety gate, the coach explains it via
+`get_adaptive_target_estimate`, Trends shows the maintenance estimate + what's still needed, never
+a target number), and nutrition depth (full macros, saved meals, photo logging).
+
 - **Health/wearable import** (Apple Health / Health Connect: weight, HR, steps, workouts). ⚠️
   **Architectural decision:** a PWA cannot read these — needs a **native shell** (Capacitor or a
   TWA + companion). Decide shell strategy here; biggest friction-killer once solved.

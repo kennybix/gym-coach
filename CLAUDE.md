@@ -20,7 +20,10 @@ coach/
   api.py            REST for the PWA: program/today, sessions, sets, weight, trends,
                     nutrition, onboarding, catalog, program
   graph.py          LangGraph coach: hydrate→screen→agent→tools→safety→commit→guard
-  review.py         weekly-review graph (scheduled, structured output)
+  review.py         weekly-review graph (scheduled, structured output; target writes are
+                    engine-owned — see adaptive.py)
+  adaptive.py       deterministic adaptive-calorie-target engine (observed maintenance from
+                    logs; the ONLY source of automated target adjustments)
   safety.py         deterministic gate: target/program checks, goal-rate cap, content
                     screening, canonical crisis copy, initial-target estimator
   pg_repo.py        PostgresCoachRepo (implements repo.CoachRepo); all the SQL
@@ -99,6 +102,11 @@ This is a health-adjacent product. These are deliberate and must be preserved:
 - **Calorie floors + single-step + goal-rate caps live in code** (`safety.py`), not the
   prompt. The onboarding starting target is computed conservatively and **clamped to the
   floors** before it is ever written; the goal rate is capped server-side.
+- **Calorie-target adjustments are system-owned** (`adaptive.py`): the weekly review applies a
+  change only on the engine's `adjust` verdict, still through `check_target_change`; the chat
+  coach must propose the engine's `suggested_target_kcal`, never its own number. Thin or
+  under-logged data yields *insufficient*/*underlogged* (hold) — never a cut. Keep the LLM
+  out of the compute path.
 - **Eating-disorder history disables automated calorie targets entirely.** Onboarding
   creates no target on that path; the coach refuses target changes. Do not add a code
   path that produces targets when this flag is set.
@@ -127,7 +135,7 @@ next human/agent. Then [`deploy/README.md`](deploy/README.md) and
 [`deploy/PHONE_ACCESS.md`](deploy/PHONE_ACCESS.md).
 
 **Built since the original baseline:** food-database nutrition logging (Open Food Facts +
-barcode + servings/recent), vitals (BP/HR), proactive coach insights, workout history,
+barcode + servings/recent), adaptive calorie targets (2026-09), vitals (BP/HR), proactive coach insights, workout history,
 program editor, in-place set/weight/nutrition editing, weekly-review scheduler (systemd
 timer), nightly DB backup, data export, UI redesign, the Tailscale phone deploy.
 

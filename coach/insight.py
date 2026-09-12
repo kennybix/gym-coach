@@ -49,6 +49,11 @@ async def generate_insight(repo: CoachRepo, model, user_id: str, focus: str = "a
         "nutrition_14d": (await repo.get_nutrition_summary(user_id, 14)).model_dump(),
         "vitals_30d": await repo.get_vitals_summary(user_id, 30),
         "measurements_90d": await repo.get_recent_measurements(user_id, 90),
+        # adaptive engine: only the parts useful for a nudge (what's missing / that it's firmed up)
+        "adaptive_28d": {
+            k: v for k, v in (await repo.get_adaptive_estimate(user_id, 28)).model_dump().items()
+            if k in ("recommendation", "needs", "days_logged", "n_weighins", "span_days", "confidence")
+        },
         "current_targets": (
             t.model_dump() if (t := await repo.get_current_targets(user_id)) else None
         ),

@@ -536,6 +536,22 @@ class PostgresCoachRepo:
             "weight_kg_used": round(weight, 1) if weight else None,
         }
 
+    async def get_adaptive_estimate(self, user_id: str, window_days: int = 28):
+        """Deterministic adaptive-target estimate over the user's own logs (see coach/adaptive.py).
+        Pure compute over weight + nutrition series; never writes."""
+        from . import adaptive
+        profile = await self.get_profile(user_id)
+        current = await self.get_current_targets(user_id)
+        return adaptive.compute_estimate(
+            profile,
+            await self.get_weight_series(user_id, window_days),
+            await self.get_nutrition_series(user_id, window_days),
+            current.daily_kcal if current else None,
+            current.created_at if current else None,
+            await self.get_latest_weight_kg(user_id),
+            window_days=window_days,
+        )
+
     async def get_session_history(self, user_id: str, limit: int = 30) -> list[dict]:
         """Past sessions (most recent first) with their logged sets + exercise names,
         for the history screen. Empty sessions are omitted."""
