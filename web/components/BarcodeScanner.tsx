@@ -52,7 +52,7 @@ export default function BarcodeScanner({ onCode, onClose }: { onCode: (code: str
   }, [onCode]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-ink/90 backdrop-blur-sm flex items-center justify-center p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] bg-ink/90 backdrop-blur-sm flex items-center justify-center p-6" onClick={onClose}>
       <div className="w-full max-w-sm card p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <p className="eyebrow">Scan barcode</p>

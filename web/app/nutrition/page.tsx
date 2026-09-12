@@ -1,5 +1,5 @@
-import NutritionView from "@/components/NutritionView";
+import FoodView from "@/components/FoodView";
 
-export default function NutritionPage() {
-  return <NutritionView />;
+export default function FoodPage() {
+  return <FoodView />;
 }

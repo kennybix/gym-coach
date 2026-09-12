@@ -50,15 +50,19 @@ test("Progress shows the energy-balance section (building or estimate, never a t
   await page.screenshot({ path: process.env.SHOT || "test-results/trends.png", fullPage: true });
 });
 
-test("Fuel shows food search", async ({ page }) => {
+test("Food shows the protein hero and the add sheet", async ({ page }) => {
   await page.goto("/nutrition");
-  await expect(page.getByPlaceholder(/Search foods/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Search" })).toBeVisible();
+  await expect(page.getByTestId("food-hero")).toBeVisible();
+  await page.getByRole("button", { name: "Add food" }).first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Search" }).click();
+  await expect(page.getByPlaceholder("Search foods")).toBeVisible();
 });
 
-test("Coach shows the chat input", async ({ page }) => {
+test("Coach shows the composer, suggested prompts and the review", async ({ page }) => {
   await page.goto("/coach");
   await expect(page.getByPlaceholder("Message your coach")).toBeVisible();
+  await expect(page.getByRole("button", { name: "New chat" })).toBeVisible();
 });
 
 test("Programs lists the library and opens the per-program editor", async ({ page }) => {
