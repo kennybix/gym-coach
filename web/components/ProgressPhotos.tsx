@@ -1,5 +1,5 @@
 "use client";
-/* Progress photo journal on Trends. Photos are stored on the machine (tailnet-only, auth-gated)
+/* Progress photo journal, a section on Progress. Photos are stored on the machine (tailnet-only,
    and shown here over time. Tap one for a full view, an optional coach note (vision feedback —
    disabled for eating-disorder history), and delete. Images load via authed fetch -> object URL
    because <img src> can't send the bearer token. */

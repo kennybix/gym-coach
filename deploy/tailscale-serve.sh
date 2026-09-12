@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
+# ============================================================================
+# DEPRECATED (2026-06-08). This script serves the gym from the MAIN tailscaled
+# node (quantoptimus.<tailnet>.ts.net). That mapping is retired: a node can hold
+# only one serve config, so sharing it with the sibling `mynah` app was fragile
+# — and `tailscale serve reset` below would take that app down.
+#
+# The gym now runs on its OWN userspace node, managed by systemd:
+#     gym-coach-tailscaled.service   (statedir ~/.local/share/tailscale-gym-coach)
+#     gym-coach-serve.service        (re-asserts the :3010 mapping at boot)
+#     -> https://gym-coach.<tailnet>.ts.net
+# Inspect:  tailscale --socket=~/.local/share/tailscale-gym-coach/tailscaled.sock serve status
+# See deploy/PHONE_ACCESS.md. Kept only for reference.
+# ============================================================================
 # Expose gym-coach to YOUR tailnet over HTTPS — private (Tailscale Serve, NOT Funnel).
 # Only devices signed into your tailnet can reach it; nothing is public.
 #

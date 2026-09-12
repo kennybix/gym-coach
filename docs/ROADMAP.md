@@ -1,5 +1,11 @@
 # Gym Coach — Improvement Roadmap
 
+**Status at 2026-09-12:** Phase 1 ✅ shipped · Phase 2 ✅ shipped · Phase 3 mostly shipped
+(see its section) · a full **UI redesign** shipped on top of all three. What's actually left is
+short: **import/restore**, **repeat-last-workout**, **rest-timer notifications**, and the
+pre-launch items (clinician sign-off, always-on hosting). Screen-by-screen UI decisions live in
+[`SYSTEM_OVERVIEW.md` §8](SYSTEM_OVERVIEW.md) and the UI invariants in [`../CLAUDE.md`](../CLAUDE.md).
+
 Living plan for the next phases. Synthesizes two independent 2026-06-06 reviews —
 [`competitive-review-2026-06-06.md`](competitive-review-2026-06-06.md) and
 [`product-capability-review-2026-06-06.md`](product-capability-review-2026-06-06.md) — which
@@ -118,14 +124,52 @@ a target number), and nutrition depth (full macros, saved meals, photo logging).
 - **Nutrition depth (selective):** full macros (carbs/fat/fiber), saved meals + favorites, better
   recent-food defaults, robust offline/error handling. Don't try to out-DB MyFitnessPal.
 
-# Phase 3 — Programming, retention, distribution
+# Phase 3 — Programming, retention, distribution  *(mostly shipped)*
 
-- **Programming:** templates/routines library, "repeat last workout", multiple routines, optional
-  progression blocks/deloads building on B4.
-- **Trust/portability:** import/restore (completes the export story).
-- **Native + retention:** packaged app (TWA/Capacitor), rest-timer **notifications**, install
-  guidance, haptics, widgets; later Watch/Wear OS. Light accountability (streaks/reminders) — keep
-  it calm, no social-comparison pressure (consistent with the wellbeing stance).
+**Programming**
+- ✅ Templates/routines library — six curated templates plus coach-designed-from-a-goal, each
+  reviewable before install (`coach/programs.py`, `ProgramsLibrary`).
+- ✅ Multiple routines in parallel, each with its own weekday schedule; Home shows only what's
+  scheduled today.
+- ✅ Drag-to-reorder program editor; per-exercise sets × reps inline.
+- ⬜ **"Repeat last workout"** — the player prefills from the last logged set per exercise, but
+  there's no one-tap "do last session again" entry point.
+- ⬜ **Progression blocks / deloads** — B4's next-load suggestion exists per lift; block
+  periodisation and scheduled deloads do not.
+
+**Trust / portability**
+- ✅ Export (JSON + per-dataset CSV) and a nightly `pg_dump` with rotation + a restore drill.
+- ⬜ **Import/restore in the app** — the missing half of the data-ownership story, and the
+  highest-value item left on this list.
+
+**Native + retention**
+- ✅ Packaged Android app (Capacitor) with Health Connect import, camera, and local notifications.
+- ✅ Daily reminders (calm, opt-in, per-time) and a food-logging streak strip.
+- ✅ Haptics on logging a set, finishing a workout, saving a sheet, switching looks.
+- ✅ Install guidance ([`deploy/PHONE_ACCESS.md`](../deploy/PHONE_ACCESS.md)) + a device smoke
+  checklist ([`deploy/DEVICE_SMOKE.md`](../deploy/DEVICE_SMOKE.md)).
+- ⬜ **Rest-timer notifications** — the timer is in-app only; it doesn't fire a notification if
+  you leave the app mid-rest.
+- ⬜ Widgets; later Watch / Wear OS.
+
+---
+
+# Phase 4 — The UI redesign  ✅ SHIPPED 2026-09-12
+
+Not in the original plan; it came out of a full screen-by-screen critique that found the app was
+"a competent logger wearing a dark-mode template" — every screen a scroll of identical cards,
+most of them permanently-open forms, with zero-states as the loudest thing on the page.
+
+- ✅ **Five user-selectable looks** (Volt, Paper, Ember, Glacier, Mono, + Auto) as CSS-variable
+  blocks on `<html data-theme>`, stamped before first paint. A look is a palette swap, not a
+  re-skin — which is only possible because every component reads tokens.
+- ✅ **A real type scale** (Bricolage Grotesque / IBM Plex Sans / IBM Plex Mono) and one lifted
+  object per screen instead of uniform cards.
+- ✅ **Home** replaces the old Today list: the day, not the database.
+- ✅ **Workout player** — one exercise at a time, rest timer owns the screen, finish summary.
+- ✅ **Progress / Food / Coach / Train** rebuilt; **all logging moved into bottom sheets**.
+- ✅ **Coach** got an identity, verdict-first reviews, suggested prompts, prose replies.
+- ✅ **Onboarding** rebuilt to match, and Home now routes a fresh token into it.
 
 ---
 
@@ -138,6 +182,13 @@ a target number), and nutrition depth (full macros, saved meals, photo logging).
 
 ## Success criteria for "I'd pay for it" (from the reviews)
 
-Reliable one-handed logging ✓ (mostly there) · PR/1RM/volume analytics (B2/B3) · transparent
-coach evidence (A2/A3) · Health import (P2) · stronger progression (B4→P3) · better food defaults
-(P2) · import/restore (P3). Phase 1 delivers the analytics + transparency half of that list.
+| Criterion | State |
+|---|---|
+| Reliable one-handed logging | ✅ workout player, sheets, offline queue |
+| PR / 1RM / volume analytics | ✅ B2/B3 |
+| Transparent coach evidence | ✅ A2/A3 evidence chips + proposal diffs |
+| Health import | ✅ Health Connect (native shell) |
+| Stronger progression | 🟡 per-lift next-load suggestion; no blocks/deloads |
+| Better food defaults | ✅ recents, saved meals, barcode, photo |
+| Import/restore | ⬜ **the one gap left** |
+| Feels like a product, not a logger | ✅ the Phase 4 redesign |

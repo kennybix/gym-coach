@@ -322,7 +322,7 @@ async def run_review(body: ReviewIn, user_id: str = Depends(get_current_user_id)
     return {"status": "ok", "assessment": out["assessment"], "changes": out["committed_changes"]}
 
 
-# Proactive "here's what I noticed" note for the Today screen. Cached per user with a short
+# Proactive "here's what I noticed" note for Home. Cached per user with a short
 # TTL so it isn't regenerated on every open (in-memory: fine for this single-host app).
 _insight_cache: dict = {}
 _INSIGHT_TTL = 6 * 3600

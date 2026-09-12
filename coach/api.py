@@ -1,4 +1,4 @@
-"""REST API for the PWA (Today screen + offline sync).
+"""REST API for the PWA (all screens + offline sync).
 
 Design notes:
   * All ids for sessions/sets are CLIENT-generated UUIDs and every write is
@@ -166,7 +166,7 @@ async def session_history(limit: int = 30, user_id: str = Depends(get_current_us
 @router.get("/exercise/{exercise_id}/stats")
 async def exercise_stats(exercise_id: str, user_id: str = Depends(get_current_user_id)):
     """Per-exercise progression: lifetime bests (est-1RM, heaviest, volume) + a per-session
-    series for charting. Powers PR detection on Today and the exercise detail view."""
+    series for charting. Powers PR detection in the workout player and the exercise detail view."""
     return await _repo.get_exercise_stats(user_id, exercise_id)
 
 

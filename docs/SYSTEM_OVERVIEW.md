@@ -57,7 +57,8 @@ works on `localhost:3010` (rewrites hit the local backend) and on the `ts.net` U
 | LiteLLM gateway | 4000 | **user** systemd | `coach-litellm.service` |
 | Backend (FastAPI) | 8010 | **user** systemd | `coach-backend.service` |
 | Frontend (Next PWA) | 3010 | **user** systemd | `coach-frontend.service` |
-| Tailscale serve re-apply | — | **user** systemd | `coach-tailscale-serve.service` (oneshot, boot) |
+| Tailscale node (dedicated) | — | **user** systemd | `gym-coach-tailscaled.service` (userspace tailscaled) |
+| Tailscale serve re-apply | — | **user** systemd | `gym-coach-serve.service` (oneshot, boot) |
 | Weekly review | — | **user** timer | `coach-review.timer` → `coach-review.service` (Mon 07:00) |
 | Nightly DB backup | — | **user** timer | `coach-backup.timer` → `coach-backup.service` (02:30) |
 
@@ -89,12 +90,26 @@ hard-killing the backend revives it in ~7s; full chain survives reboot.
 
 ## 5. Data layer
 
-Postgres db `coachdb`, role `coach`/`coach`. Migrations in [`coach/migrations/`](../coach/migrations/):
-`001_core` (profiles, programs, program_exercises, sessions, set_logs, body_metrics,
-nutrition_logs, targets, coach_reviews), `003_targets_append_only` (trigger), `004_pgvector`
-(rag_chunks, **vector(1024) + HNSW** — ivfflat missed rows on a small corpus), `005_vitals`,
-`006_food_entries`. (`002` is Supabase-only, skipped.) LangGraph checkpoint tables are
-auto-created by `AsyncPostgresSaver`. `dev_up.sh` bootstraps a fresh DB.
+Postgres db `coachdb`, role `coach`/`coach`. **17 migrations** in
+[`coach/migrations/`](../coach/migrations/), applied by the tracked runner
+[`scripts/migrate.sh`](../scripts/migrate.sh) (a `schema_migrations` table records what ran, so
+re-running is safe on fresh *and* existing databases):
+
+| | |
+|---|---|
+| `001_core` | profiles, programs, program_exercises, sessions, set_logs, body_metrics, nutrition_logs, targets, coach_reviews |
+| `002_rls_supabase` | Supabase-only — **skipped** by the runner |
+| `003_targets_append_only` | trigger enforcing target history |
+| `004_pgvector` | rag_chunks, **vector(1024) + HNSW** (ivfflat missed rows on a small corpus) |
+| `005_vitals` | blood pressure + heart rate, many per day |
+| `006_food_entries` `009_food_macros` `010_meals` | item-level food log, carbs/fat/fiber, saved meals |
+| `007_cardio` `008_set_type` `015_set_incline` | duration/distance, warmup/drop/failure tags, treadmill incline |
+| `011_measurements` `013_belly` `012_progress_photos` | tape measurements, belly site, private photo journal |
+| `014_coach_messages` | chat transcripts (survive a reinstall) |
+| `016_program_goal` `017_program_schedule` | program goal text, per-weekday scheduling |
+
+LangGraph checkpoint tables are auto-created by `AsyncPostgresSaver`. `dev_up.sh` bootstraps a
+fresh DB end to end.
 
 ---
 
@@ -102,11 +117,20 @@ auto-created by `AsyncPostgresSaver`. `dev_up.sh` bootstraps a fresh DB.
 
 - **URL:** `https://gym-coach.taile8b1de.ts.net` — **tailnet-only** (Serve, *not* Funnel),
   so nothing is public; the user's signed-in devices are the gate, the JWT is the data auth.
-- Set up once: enable HTTPS in the Tailscale admin console; `sudo tailscale set --operator=$USER`;
-  then `tailscale serve --bg http://127.0.0.1:3010` (script: [`deploy/tailscale-serve.sh`](../deploy/tailscale-serve.sh)).
-  Serve config persists in tailscaled across reboots; `coach-tailscale-serve.service` re-asserts it.
-- **No credentials in the JS bundle** — the bearer token is pasted once in the Setup tab and
-  kept in the device's localStorage. `web/.env.local` must NOT contain `NEXT_PUBLIC_DEV_TOKEN`
+- Served from its **own dedicated userspace tailscaled node** (`gym-coach-tailscaled.service`,
+  state in `~/.local/share/tailscale-gym-coach/`), so this app owns its hostname and serve
+  config and can't clobber the sibling `mynah` app. `gym-coach-serve.service` re-asserts the
+  mapping at boot. Inspect it with
+  `tailscale --socket=~/.local/share/tailscale-gym-coach/tailscaled.sock serve status`.
+  (The older shared mapping on the main node, `coach-tailscale-serve.service`, is retired and
+  disabled — one serve config per node made the shared link fragile.)
+- Set up once: enable HTTPS in the Tailscale admin console and
+  `sudo tailscale set --operator=$USER`.
+- **Also installable as an APK** — the Capacitor shell adds Health Connect import and local
+  notifications ([`deploy/ANDROID_APP.md`](../deploy/ANDROID_APP.md)); it's served for
+  sideloading at `/gym-coach.apk`.
+- **No credentials in the JS bundle** — the bearer token is pasted once under
+  **Setup → Signed in** and kept in the device's localStorage. `web/.env.local` must NOT contain `NEXT_PUBLIC_DEV_TOKEN`
   for any served build. `apiBase()` returns same-origin (relative) so the Setup "API URL" is
   optional. Mint a token: `SUPABASE_JWT_SECRET=... python mint_token.py <uuid>`.
 - To go **public** later (share beyond the tailnet): custom domain via the droplet
@@ -137,8 +161,13 @@ cd ~/Documents/Projects/gym-coach && set -a; . ./.env; set +a
 ./.venv/bin/python -m coach.rag.fetch_sources --sources seed/rag_sources.json --out /tmp/c.json
 ./.venv/bin/python -m coach.rag.ingest_corpus --manifest /tmp/c.json
 
-# tests
+# tests — backend (98 with a DSN; the 8 DB tests skip without one), web unit, web e2e
 ./.venv/bin/python -m pytest coach/tests -q
+cd web && npm test                                   # Vitest: the offline queue
+cd web && TK=$(python ../mint_token.py <uuid> | awk '/token:/{print $2}') npm run test:e2e
+
+# rebuild the Android APK (then RESTORE the server build — see the gotcha below)
+bash deploy/build-apk.sh && (cd web && npm run build) && systemctl --user restart coach-frontend
 
 # restore a backup
 gunzip -c <file>.sql.gz | PGPASSWORD=coach psql -h localhost -U coach -d coachdb
@@ -147,12 +176,15 @@ gunzip -c <file>.sql.gz | PGPASSWORD=coach psql -h localhost -U coach -d coachdb
 **Toolchain gotchas:** frontend needs **Node 20** via nvm (Tailwind v4 oxide); `next dev`
 trips this machine's inotify watcher limit, so production build + `next start` is used.
 Python backend uses the repo `.venv`. Secrets live in `.env` (gitignored).
+**The APK build clobbers the server build** — `deploy/build-apk.sh` runs
+`NATIVE_BUILD=1 next build` (static export), so always re-run `npm run build` and restart
+`coach-frontend` afterwards or the served site becomes the static export.
 
 ---
 
 ## 8. Feature surface (so you know what exists)
 
-**UI redesign (2026-09-12, four commits a46671f → 7c25db8).** Tabs are now **Home / Train / Food /
+**UI redesign (2026-09-12, `a46671f` → `9b33665`).** Tabs are now **Home / Train / Food /
 Progress / Coach**, Setup sits behind the gear on Home. Five user-selectable **looks** (Volt,
 Paper, Ember, Glacier, Mono + Auto) are CSS-variable blocks on `<html data-theme>` (`web/lib/theme.ts`,
 `ThemePicker`, no-flash inline script in `layout.tsx`). Type: Bricolage Grotesque / IBM Plex Sans /
@@ -179,13 +211,21 @@ The screen list below describes the redesigned surface.
   evidence chips, history/confirm sheets; grounded chat (reads real logs, proposes→safety→commit).
 - **Setup** — Look picker, Your details + Access token rows (sheets), sync, reminders, Health
   Connect (native), export/backup.
-- **Onboarding** — 5-step wizard with optional baseline vitals.
+- **Onboarding** (`/onboarding`) — five steps then a summary: pick a look, about you, goal +
+  pace, health flags (injury / disordered-eating history / optional baseline vitals), program
+  (template, coach-designed from a goal, or built from the catalog), then the starting point and
+  what happens next. The tab bar is hidden during first run; Home redirects a fresh token here.
 - **Knowledge** — `/knowledge/ask` cited answers over a vetted RAG corpus (CDC/NHS/MedlinePlus/
   OpenStax, ~257 chunks, governance-gated, openly-licensed).
 
-New REST (beyond the original): `/api/sets/{delete,update}`, `/api/metrics/weight/{set,delete}`,
-`/api/sessions`, `/api/vitals(+update/delete)`, `/api/foods/{search,recent,barcode,log,delete}`,
-`/api/export`, `/coach/insight`, `/api/program/today` returns program meta.
+**REST beyond the original baseline** — `/api/home` (everything Home needs in one call),
+`/api/trends` (adds `adaptive` + `latest_weight`), `/api/sets/{sync,delete,update}`,
+`/api/sessions`, `/api/metrics/weight/{set,delete}`, `/api/vitals(+update/delete)`,
+`/api/foods/{search,recent,barcode,log,delete}`, `/api/meals(+log/delete)`,
+`/api/measurements(+delete)`, `/api/photos(+update/delete)`, `/api/exercise/{id}/stats`,
+`/api/programs(+templates/template/{key}/active/schedule/update/delete/clear-inactive)`,
+`/api/profile`, `/api/export`; and on the coach side `/coach/{insight,threads,review/latest,
+design-program,parse-workout,parse-food-photo,photo-note,compare-photos}`.
 
 ---
 
@@ -214,8 +254,11 @@ New REST (beyond the original): `/api/sets/{delete,update}`, `/api/metrics/weigh
 
 ## 10. Open items (pre-real-launch)
 
-1. **Clinician signs** the safety checklist.
+1. **Clinician signs** the safety checklist ([`deploy/SAFETY_REVIEW.md`](../deploy/SAFETY_REVIEW.md)).
 2. **Availability** beyond this machine — only up while the desktop is awake; the always-on
    alternative is the droplet+domain (Path B), keeping the LLM here over Tailscale.
-3. **Device sync** (Apple Health / smart scale) to kill remaining manual weight/vitals entry.
-4. Real-device QA pass (iOS service-worker behaviour if ever used on iPhone; the target is Android).
+3. **Import/restore** — export is done; the other half completes the data-ownership story.
+4. **Device-side QA after each APK** — run [`deploy/DEVICE_SMOKE.md`](../deploy/DEVICE_SMOKE.md);
+   WebView camera/keyboard/safe-area bugs only show on the phone.
+5. Housekeeping: `profiles` holds a few stale test users from earlier bring-up work, and
+   `run_review` iterates every profile — prune them if the weekly-review log gets noisy.

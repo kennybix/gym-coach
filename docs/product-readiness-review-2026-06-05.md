@@ -1,5 +1,10 @@
 # Product Readiness Review - 2026-06-05
 
+> **Historical snapshot.** Kept for the reasoning and evidence behind the roadmap; it
+> describes the app as it was on this date, before the Phase 1–2 work and the 2026-09-12 UI
+> redesign. For the current state see [`ROADMAP.md`](ROADMAP.md) and
+> [`SYSTEM_OVERVIEW.md`](SYSTEM_OVERVIEW.md).
+
 This review answers a blunt product question: is the current app something a normal
 fitness customer would likely pay to use?
 

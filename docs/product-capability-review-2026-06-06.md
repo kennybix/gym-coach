@@ -1,5 +1,10 @@
 # Gym Coach Product Capability Review
 
+> **Historical snapshot.** Kept for the reasoning and evidence behind the roadmap; it
+> describes the app as it was on this date, before the Phase 1–2 work and the 2026-09-12 UI
+> redesign. For the current state see [`ROADMAP.md`](ROADMAP.md) and
+> [`SYSTEM_OVERVIEW.md`](SYSTEM_OVERVIEW.md).
+
 Date: 2026-06-06
 
 Scope: this review intentionally ignores the authentication limitation because the app is a proof of concept. It focuses on the user-facing product, features, capability depth, and how the app compares with similar workout, coaching, and nutrition apps on the Apple App Store and Google Play Store.

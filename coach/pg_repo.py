@@ -311,7 +311,7 @@ class PostgresCoachRepo:
         )
         return str(row["review_id"])
 
-    # --- logging API (PWA Today screen; idempotent for offline replay) --------
+    # --- logging API (the workout player; idempotent for offline replay) ------
     async def get_program_slots(self, user_id: str, scheduled_only: bool = False) -> list[dict]:
         """Program slots with prescriptions + catalog media, for the session UI. With
         scheduled_only, returns just the programs scheduled for TODAY (server weekday); a program

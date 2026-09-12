@@ -13,11 +13,20 @@ the static web export and talks to the backend over Tailscale — same app, same
   RestingHeartRate and pushes them through the normal idempotent endpoints (weight = per-day
   upsert; vitals keyed by the Health Connect record id). Triggered from **Setup → Sync from
   Health Connect** (only shown on the native app).
+- **Looks, sheets and the workout player** are the same web build, so the APK picks up every
+  UI change automatically — no native work needed for UI.
 
 ## Build
 ```bash
 bash deploy/build-apk.sh
+# then RESTORE the server build — see the warning below
+(cd web && npm run build) && systemctl --user restart coach-frontend
 ```
+
+> **The APK build clobbers the served site.** `build-apk.sh` runs `NATIVE_BUILD=1 next build`,
+> which replaces `.next` with a static export that has the tailnet API URL baked in. Always
+> re-run `npm run build` and restart `coach-frontend` afterwards, or the PWA at
+> `https://gym-coach.taile8b1de.ts.net` becomes that export.
 Toolchain (one-time): Android SDK at `~/Android` (cmdline-tools + `platforms;android-36` +
 `build-tools;36.0.0`), and a **full JDK 21** at `~/jdk` (the system Java is a JRE — no `javac`).
 

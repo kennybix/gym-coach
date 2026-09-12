@@ -1,96 +1,168 @@
 # Gym Coach
 
-A personal weight-loss training app: log your workouts, nutrition, and vitals, and get an
-**AI coach that reads your actual data**, adapts your plan through a deterministic safety
-gate, reviews each week, and surfaces a proactive "here's what I noticed" — all on an
-installable, offline-capable PWA. It runs entirely on one machine and is served to the
-phone privately over Tailscale.
+**A private AI coach over your own training data.** Log workouts, food, weight and vitals;
+get a coach that reads your actual logs before it says anything, recalibrates your calorie
+target from a deterministic energy-balance engine, reviews every week, and can never write to
+your data without passing a safety gate. It runs entirely on one machine and reaches your
+phone privately over Tailscale — as an installable PWA or a sideloaded Android app.
 
 <table>
   <tr>
-    <td align="center"><img src="images/today.png" width="155"><br><sub><b>Today</b><br>log sets · coach insight</sub></td>
-    <td align="center"><img src="images/trends.png" width="155"><br><sub><b>Trends</b><br>weight + vitals</sub></td>
-    <td align="center"><img src="images/fuel.png" width="155"><br><sub><b>Fuel</b><br>food DB + macros</sub></td>
-    <td align="center"><img src="images/coach.png" width="155"><br><sub><b>Coach</b><br>grounded chat</sub></td>
-    <td align="center"><img src="images/setup.png" width="155"><br><sub><b>Setup</b><br>program · export</sub></td>
+    <td align="center"><img src="images/home.png" width="155"><br><sub><b>Home</b><br>today's workout · quick logs</sub></td>
+    <td align="center"><img src="images/workout.png" width="155"><br><sub><b>Workout</b><br>one lift at a time</sub></td>
+    <td align="center"><img src="images/progress.png" width="155"><br><sub><b>Progress</b><br>trend · energy balance</sub></td>
+    <td align="center"><img src="images/food.png" width="155"><br><sub><b>Food</b><br>protein goal · meals</sub></td>
+    <td align="center"><img src="images/coach-review.png" width="155"><br><sub><b>Coach</b><br>weekly review</sub></td>
+  </tr>
+</table>
+
+<sub>Screens shown with seeded demo data, not real user logs.</sub>
+
+**Five looks, switchable in Setup** — the whole UI is CSS-variable tokens, so a look is a
+palette swap, not a re-skin:
+
+<table>
+  <tr>
+    <td align="center"><img src="images/home.png" width="128"><br><sub>Volt</sub></td>
+    <td align="center"><img src="images/look-paper.png" width="128"><br><sub>Paper</sub></td>
+    <td align="center"><img src="images/look-ember.png" width="128"><br><sub>Ember</sub></td>
+    <td align="center"><img src="images/look-glacier.png" width="128"><br><sub>Glacier</sub></td>
+    <td align="center"><img src="images/look-mono.png" width="128"><br><sub>Mono</sub></td>
   </tr>
 </table>
 
 ## What it does
 
-- **Today** — start a session and log sets with typeable weight/reps; edit or remove a
-  logged set in place; add exercises ad-hoc; a **proactive coach note** ("your latest BP
-  119/78 and HR 71 look steady…") you can tap to discuss.
-- **Trends** — adherence bars, a weight chart where you **tap a point to edit/remove** that
-  weigh-in, and a **vitals card** (blood pressure + heart rate, many per day, with sparklines).
-- **Fuel** — **food-database logging**: search [Open Food Facts](https://openfoodfacts.org),
-  **scan a barcode**, or re-tap a recent food; portions in grams or servings. A macro summary
-  shows protein as a goal to hit and calories *without* over/under judgment (wellbeing-first).
-- **Coach** — chat grounded in your real logs (it calls read tools before it claims progress),
-  proposes plan/target changes through a **safety gate** (it never writes directly), keeps
-  multi-chat history, sees your vitals, and posts a **weekly review**.
-- **Setup** — edit your program, browse/fix workout **history**, and **export a full backup**
-  (JSON + per-dataset CSV).
+**Home** — the day, not a database. Today's workout is one object (exercise count, estimated
+minutes, set progress, one button); three tiles open bottom sheets for a weigh-in, food or a
+blood-pressure reading; the coach says one grounded line you can tap to discuss.
+
+**Workout** — a player, not a list. One exercise at a time with a looping demo, the target and
+your best estimated 1RM, two big number fields, one **Log set** button, then the rest timer
+takes the screen. Swipe through the session, flag PRs as they happen, finish with a summary
+(sets, exercises, minutes, volume, PRs). Cardio logs time, distance and treadmill incline
+instead of weight × reps.
+
+**Progress** — the weight line is the hero, with an honest rate (no kg/week figure until 4+
+weigh-ins across 2+ weeks) and distance to goal. Below it: the week in three tiles, the
+**energy-balance estimate** with its confidence, vitals with sparklines, and body measurements
+and progress photos as sections. Every log opens as a sheet; no form sits on the screen.
+
+**Food** — today's meals first, protein as a ring to close, calories stated plainly with no
+over/under verdict. One sheet adds food by [Open Food Facts](https://openfoodfacts.org)
+search, barcode scan, a photo of the plate, a recent food, a saved meal, or a day total.
+
+**Coach** — chat grounded in your logs. It calls read tools before making a claim, shows the
+exact figures it used as **evidence chips**, and proposes target or program changes through a
+safety gate rather than writing them. It also posts a verdict-first weekly review.
+
+<p align="center"><img src="images/coach.png" width="300"><br><sub>Every data claim carries the figures behind it.</sub></p>
+
+**Train** — a program library you can run several routines from in parallel, each with its own
+weekday schedule; a drag-to-reorder editor; workout history you can correct. Programs come
+from curated templates, or the coach designs one from a goal in your words ("stronger back,
+3 days a week").
+
+**Also** — a five-step first-run wizard (it opens by letting you pick a look), a cited knowledge endpoint over a vetted corpus, daily
+reminders, offline logging with a replay queue, full data export, and Health Connect import on
+the Android build.
+
+## The interesting part: safety and who owns the numbers
+
+This is health-adjacent software, so the model is deliberately not in charge.
+
+- **The LLM proposes; the system disposes.** The agent only calls read tools and `propose_*`
+  tools that *stage* a typed change. Only the `safety` → `commit` graph nodes write. Writes are
+  unreachable from the model.
+- **Calorie targets are owned by a deterministic engine** ([`coach/adaptive.py`](coach/adaptive.py)).
+  It derives your real maintenance from logged intake and your weight slope
+  (`intake − slope × 7700`), blends that with a Mifflin-St Jeor anchor by how much data backs
+  it, and only then suggests a target — floored, capped to ±10% per step, dead-banded at
+  100 kcal, with a 14-day cooldown. Thin data or intake that looks under-logged returns *hold*,
+  never a cut. The weekly review applies only this engine's verdict; the coach explains it.
+- **Floors, rate caps and screening live in code**, not the prompt
+  ([`coach/safety.py`](coach/safety.py)): calorie floors, a capped weekly loss rate, and
+  inbound/outbound content screening that routes disordered-eating, self-harm, extreme-deficit
+  and train-through-injury signals to support instead of optimised advice.
+- **Disclosing a history of disordered eating disables automated calorie targets entirely** —
+  onboarding writes no target, the coach refuses changes, the engine reports `disabled`.
+- **No screen ever suggests a calorie or macro number.** Targets come only from onboarding, the
+  engine or the coach.
+- **Target history is append-only** at the database level, so every change keeps its rationale.
 
 ## How it's built
 
-- **Backend** (`coach/`) — FastAPI + a LangGraph coach agent + a **deterministic safety layer**
-  (calorie floors, ED-history blocks, content screening — in code, not the prompt) + Postgres
-  (asyncpg). RAG (pgvector) and an LLM-as-judge eval harness included.
-- **Frontend** (`web/`) — Next.js 15 PWA (Node 20), offline write-queue, installable.
-- **LLM** — chat on **GPT-5.5 via a local CLI proxy** (subscription-backed, OpenAI-compatible);
-  **embeddings** via a **LiteLLM → Ollama** gateway (local `mxbai-embed-large`, free).
-- **Knowledge** — a cited RAG corpus from openly-licensed sources (CDC, NHS, MedlinePlus,
-  OpenStax), governance-gated.
+- **Backend** ([`coach/`](coach)) — FastAPI, a LangGraph agent
+  (`hydrate → screen → agent → tools → safety → commit → guard`), the deterministic safety and
+  adaptive-target layers, Postgres via asyncpg, a pgvector RAG pipeline, and an LLM-as-judge
+  eval harness.
+- **Frontend** ([`web/`](web)) — Next.js 15 App Router PWA on Node 20. A token design system
+  (five looks, a fixed type scale in Bricolage Grotesque / IBM Plex Sans / IBM Plex Mono, sheet
+  and ring primitives), an IndexedDB write queue that replays on reconnect, and a Capacitor
+  Android shell for Health Connect.
+- **LLM** — chat on **GPT-5.5 through a local OpenAI-compatible CLI proxy** (subscription-backed,
+  no per-token cost); **embeddings** through a **LiteLLM → Ollama** gateway running
+  `mxbai-embed-large` locally. Provider-agnostic via `init_chat_model`.
+- **Knowledge** — 257 chunks from openly-licensed sources (CDC, NHS, MedlinePlus, OpenStax),
+  governance-gated, answers always cited.
 
-> **New here (human or agent)?** Read [`docs/SYSTEM_OVERVIEW.md`](docs/SYSTEM_OVERVIEW.md) —
-> the full architecture, services/ports, LLM wiring, phone deploy, and an operations cookbook.
-> Then [`CLAUDE.md`](CLAUDE.md) for the architectural + safety invariants.
->
-> Product/readiness notes:
-> [`docs/product-capability-review-2026-06-06.md`](docs/product-capability-review-2026-06-06.md),
-> [`docs/product-readiness-review-2026-06-05.md`](docs/product-readiness-review-2026-06-05.md),
-> [`docs/engineering-review-2026-06-05.md`](docs/engineering-review-2026-06-05.md).
+> **New here, human or agent?** Read [`docs/SYSTEM_OVERVIEW.md`](docs/SYSTEM_OVERVIEW.md) — the
+> whole running system: architecture, ports, services, LLM wiring, phone deploy, operations
+> cookbook. Then [`CLAUDE.md`](CLAUDE.md) for the invariants you must not break, and
+> [`docs/ROADMAP.md`](docs/ROADMAP.md) for what's shipped and what's next.
 
 ## Run it locally
 
 ```bash
 pip install -r requirements.txt
-./dev_up.sh                                   # Postgres + migrations (PG 16 + pgvector)
-cp .env.example .env                          # fill in COACH_DB_URI, SUPABASE_JWT_SECRET, and
-                                              # the LLM env (OPENAI_BASE_URL/KEY -> your proxy)
+./dev_up.sh                          # Postgres 16 + pgvector, creates coachdb, runs migrations
+cp .env.example .env                 # COACH_DB_URI, SUPABASE_JWT_SECRET, and the LLM env
 set -a; . ./.env; set +a
 
-uvicorn coach.service:app --port 8010         # backend
-cd web && npm install && npm run build && npm run start -- --port 3010   # frontend (Node 20)
-
-python mint_token.py <user-uuid>              # bearer token for the Setup tab
+uvicorn coach.service:app --port 8010                   # backend
+cd web && npm install && npm run build && npm start      # frontend on :3000 (Node 20)
 ```
 
-Open `http://localhost:3010`, go to **Setup**, paste the token (the API URL is automatic),
-and onboard. Without an LLM configured, logging works and coach endpoints return 503.
+Then mint a token and open the app:
 
-For the production setup on this machine (systemd services, auto-restart, nightly backup,
-weekly review) see [`deploy/README.md`](deploy/README.md).
+```bash
+python mint_token.py <user-uuid>     # prints a bearer token
+```
+
+Open the site, go to **Setup → Signed in**, paste the token (leave the server URL blank — the
+frontend proxies the API on the same origin), and the first-run wizard takes it from there.
+Without an LLM configured, logging works normally and coach endpoints return 503.
+
+For the always-on setup on this machine (systemd units, weekly review, nightly backup) see
+[`deploy/README.md`](deploy/README.md).
 
 ## On your phone
 
-Served **tailnet-only** over HTTPS via Tailscale Serve — private to your devices, no public
-exposure, no credentials in the JS bundle (token entered once on-device). Full steps:
-[`deploy/PHONE_ACCESS.md`](deploy/PHONE_ACCESS.md).
+Served **tailnet-only** over HTTPS by Tailscale Serve — private to your own devices, nothing
+public, no credentials in the JS bundle. Install it as a PWA, or sideload the Capacitor APK to
+get Health Connect import and local notifications. Steps:
+[`deploy/PHONE_ACCESS.md`](deploy/PHONE_ACCESS.md) and
+[`deploy/ANDROID_APP.md`](deploy/ANDROID_APP.md); post-install checklist:
+[`deploy/DEVICE_SMOKE.md`](deploy/DEVICE_SMOKE.md).
 
 ## Tests
 
 ```bash
-python -m pytest coach/tests -q                                  # no DB/LLM needed
-COACH_DB_URI=... COACH_SEED_DIR=... python -m coach.smoke_test   # repo vs live PG
-COACH_DB_URI=... COACH_SEED_DIR=... python -m coach.e2e_test     # full slice vs live PG
+python -m pytest coach/tests -q                 # 90 unit/integration tests, no DB or LLM needed
+COACH_DB_URI=... python -m pytest coach/tests -q    # +8 DB integration tests (throwaway user)
+cd web && npm test                              # Vitest: the offline queue
+cd web && TK=$(python ../mint_token.py <uuid> | awk '/token:/{print $2}') npm run test:e2e
+                                                # Playwright: read-only pass over every screen
+COACH_DB_URI=... COACH_SEED_DIR=... python -m coach.smoke_test   # data layer vs live Postgres
+COACH_DB_URI=... COACH_SEED_DIR=... python -m coach.e2e_test     # full slice, scripted model
 ```
 
-## Safety & licensing
+CI runs pytest, Vitest and a production `next build` on every push.
 
-This is health-adjacent. Safety thresholds are **evidence-aligned** to CDC/NHS guidance and
-documented, but a **clinician must sign off** before any real launch —
-see [`deploy/SAFETY_REVIEW.md`](deploy/SAFETY_REVIEW.md). Exercise catalog from
-[free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain). Personal
-project — review licensing before any public distribution.
+## Safety and licensing
+
+Thresholds are **evidence-aligned** to CDC and NHS guidance and documented in code, but a
+**clinician must sign off** before this is used by anyone but its author — see
+[`deploy/SAFETY_REVIEW.md`](deploy/SAFETY_REVIEW.md). Exercise catalog from
+[free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain); food data from
+Open Food Facts (ODbL). Personal project — review licensing before any public distribution.

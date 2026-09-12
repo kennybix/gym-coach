@@ -18,29 +18,52 @@ Already done (app side, verified):
 Open <https://login.tailscale.com/admin/dns> → **Enable HTTPS**. (MagicDNS must be on; it is.)
 
 ### 2. Turn on serving (on this machine, one time)
+
+The gym has its **own** userspace Tailscale node so it can't clash with the sibling `mynah`
+app, and two systemd units keep it up. They're already installed and enabled here; on a fresh
+machine:
+
 ```bash
-cd ~/Documents/Projects/gym-coach
-sudo bash deploy/tailscale-serve.sh
+cp deploy/systemd/gym-coach-*.service ~/.config/systemd/user/ && systemctl --user daemon-reload
+systemctl --user enable --now gym-coach-tailscaled.service
+SOCK=~/.local/share/tailscale-gym-coach/tailscaled.sock
+sudo tailscale --socket=$SOCK up --hostname=gym-coach     # auth this node once
+systemctl --user enable --now gym-coach-serve.service
+tailscale --socket=$SOCK serve status                      # expect :3010 on the gym-coach host
 ```
-You should see a mapping `https://gym-coach.taile8b1de.ts.net → http://127.0.0.1:3010`.
+
+You should see `https://gym-coach.taile8b1de.ts.net → http://127.0.0.1:3010`.
+(`deploy/tailscale-serve.sh` is the retired shared-node version — don't run it; it would reset
+the other app's serve config.)
 
 ### 3. On the S26+
 1. Install **Tailscale** from the Play Store, sign in as **oyetundedamilare@gmail.com**, toggle it **on**.
 2. Open **`https://gym-coach.taile8b1de.ts.net`** in Chrome.
-3. Go to **Setup** → paste your **bearer token** (below) into "Bearer token" → **Save**.
-   (Leave "API base URL" blank — it uses the site automatically.)
+3. Tap the **gear** on Home → **Signed in** → paste your **bearer token** (below) → **Save**.
+   (Leave "Server URL" blank — it uses the site automatically.)
 4. Chrome menu → **Add to Home screen** to install the PWA. Open it from the icon —
    full-screen, offline-capable, and barcode-camera works (real HTTPS).
+5. First run walks you through a five-step wizard; it opens by letting you pick a **look**
+   (Volt, Paper, Ember, Glacier, Mono, or Auto — changeable any time under Setup → Look).
 
 **Your token** (1-year, user with your existing data):
 ```
 <paste your token — mint with: SUPABASE_JWT_SECRET=... python mint_token.py 11111111-1111-1111-1111-111111111111>
 ```
 
+## Or install the Android app
+
+The PWA covers everything except **Health Connect import** and **local notifications**, which
+need the native shell. To sideload it: `bash deploy/build-apk.sh`, restore the server build
+(`(cd web && npm run build) && systemctl --user restart coach-frontend`), then download
+`https://gym-coach.taile8b1de.ts.net/gym-coach.apk` on the phone. Details:
+[`ANDROID_APP.md`](ANDROID_APP.md). After installing, run [`DEVICE_SMOKE.md`](DEVICE_SMOKE.md).
+
 ## Notes
 - **Availability:** the app is up only while this machine is on/awake (the LLM lives here).
 - **Security:** tailnet-only — your devices, signed in, are the gate. The bearer token is
-  the data auth (unforgeable JWT). To go truly public later, see the Funnel line in
-  `tailscale-serve.sh` and add an auth layer first.
-- **After code changes:** `systemctl --user restart coach-backend` (and rebuild + restart
-  `coach-frontend` for UI changes). Serve config persists across reboots.
+  the data auth (unforgeable JWT). To go truly public later you'd add `tailscale funnel` — put
+  an auth layer in front of it first.
+- **After code changes:** `systemctl --user restart coach-backend`; for UI changes rebuild
+  (`cd web && npm run build`) then restart `coach-frontend`. Serve config persists across
+  reboots, and `gym-coach-serve.service` re-asserts it at boot.

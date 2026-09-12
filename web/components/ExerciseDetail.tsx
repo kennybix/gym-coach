@@ -1,6 +1,6 @@
 "use client";
 /* Per-exercise progression: lifetime bests + an estimated-1RM-over-time chart. Opened from a
-   tap on the exercise on Today. Read-only; data from /api/exercise/{id}/stats. */
+   tap on the exercise on Home or in the workout player. Read-only; /api/exercise/{id}/stats. */
 import { useEffect, useState } from "react";
 import { exerciseStats, type ExerciseStats } from "@/lib/api";
 import ExerciseAnimation from "./ExerciseAnimation";

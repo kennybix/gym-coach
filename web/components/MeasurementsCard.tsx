@@ -1,5 +1,5 @@
 "use client";
-/* Body measurements on Trends — circumferences (cm) + body-fat %, one set per day (upserted).
+/* Body measurements, a section on Progress — circumferences (cm) + body-fat %, one set/day.
    Each field shows its name ABOVE a full-width stepper (so the number is always visible in a
    2-col grid), with a "How to measure" guide since people don't always know where to measure. */
 import { useCallback, useEffect, useState } from "react";

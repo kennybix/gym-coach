@@ -1,5 +1,10 @@
 # Gym Coach — Honest Feature & Competitive Review (2026-06-06)
 
+> **Historical snapshot.** Kept for the reasoning and evidence behind the roadmap; it
+> describes the app as it was on this date, before the Phase 1–2 work and the 2026-09-12 UI
+> redesign. For the current state see [`ROADMAP.md`](ROADMAP.md) and
+> [`SYSTEM_OVERVIEW.md`](SYSTEM_OVERVIEW.md).
+
 Scope per request: **features and capabilities only.** Auth/single-user/self-hosted POC
 limitations are set aside — this judges *what the product does*, not how it's deployed.
 Grounded in the actual codebase (endpoints, components, catalog, RAG) and benchmarked against

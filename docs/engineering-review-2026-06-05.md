@@ -1,5 +1,10 @@
 # Engineering Review - 2026-06-05
 
+> **Historical snapshot.** Kept for the reasoning and evidence behind the roadmap; it
+> describes the app as it was on this date, before the Phase 1–2 work and the 2026-09-12 UI
+> redesign. For the current state see [`ROADMAP.md`](ROADMAP.md) and
+> [`SYSTEM_OVERVIEW.md`](SYSTEM_OVERVIEW.md).
+
 This note captures the current review of the Gym Coach work in progress. It is written
 as an action list: fix the `P0` items before using the app anywhere outside private
 local development, then work down the list.

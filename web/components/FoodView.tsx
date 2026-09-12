@@ -115,8 +115,8 @@ function Inner() {
             <p className="t-sec mt-2 tnum">{dayKcal.toLocaleString()} kcal{data.target_kcal ? ` · target ${data.target_kcal.toLocaleString()}` : ""}</p>
           </div>
         </div>
-        <div className="flex items-center justify-between mt-5">
-          <div className="flex gap-2">
+        <div className="flex items-center justify-between gap-3 mt-5">
+          <div className="flex gap-1.5 min-w-0">
             {strip.map((d) => (
               <button key={d.date} onClick={() => setSelected(d.date)} aria-label={pretty(d.date)}
                 className={`w-8 h-8 rounded-full text-[11px] font-mono flex items-center justify-center border transition-transform active:scale-90 ${d.on ? "bg-volt text-onvolt border-volt" : "border-line text-dim"} ${d.date === selected ? "ring-2 ring-bone/70 ring-offset-2 ring-offset-lift" : ""}`}>

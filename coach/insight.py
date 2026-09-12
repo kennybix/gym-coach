@@ -1,4 +1,4 @@
-"""Proactive coach insight — a short, grounded "here's what I noticed" for the Today screen.
+"""Proactive coach insight — a short, grounded "here's what I noticed" line for Home.
 
 A one-shot LLM call over a compact data snapshot (no tools, no writes, no DB mutation).
 Cheap and fast; the service caches the result per user with a short TTL so it isn't

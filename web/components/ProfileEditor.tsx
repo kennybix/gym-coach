@@ -1,7 +1,7 @@
 "use client";
 /* Edit the details captured at onboarding (the `profiles` row): sex, birth year, height,
    activity, goal. These power the body-fat estimate, the energy maths, and the body figure —
-   so being able to fix them matters. Weight is NOT here (it's a weigh-in, edited on Trends). */
+   so being able to fix them matters. Weight is NOT here (it's a weigh-in, logged from a sheet). */
 import { useEffect, useState } from "react";
 import { apiGet, apiPost, configured } from "@/lib/api";
 import NumField from "./NumField";
