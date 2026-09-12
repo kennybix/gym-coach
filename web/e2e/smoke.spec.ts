@@ -66,7 +66,7 @@ test("Coach shows the composer, suggested prompts and the review", async ({ page
 });
 
 test("Programs lists the library and opens the per-program editor", async ({ page }) => {
-  await page.goto("/programs");
+  await page.goto("/train");
   await expect(page.getByRole("button", { name: "+ Add a program" })).toBeVisible();
   const firstProgram = page.locator('a[href^="/program?id="]').first();
   await expect(firstProgram).toBeVisible();
@@ -78,6 +78,7 @@ test("Programs lists the library and opens the per-program editor", async ({ pag
 
 test("Setup shows token field + expiry", async ({ page }) => {
   await page.goto("/settings");
-  await expect(page.getByText("Bearer token")).toBeVisible();
+  await expect(page.getByText("Signed in")).toBeVisible();
   await expect(page.getByText(/Token valid until/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Volt" })).toBeVisible();
 });

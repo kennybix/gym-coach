@@ -24,7 +24,7 @@ export default function ProfileEditor() {
       .catch(() => setMsg("Finish onboarding first, then your details show up here."));
   }, []);
 
-  if (!p) return msg ? <div className="card p-5 rise"><p className="text-dim text-xs">{msg}</p></div> : null;
+  if (!p) return msg ? <p className="t-sec">{msg}</p> : <div className="h-40 animate-pulse rounded-2xl bg-panel2" />;
 
   const set = (patch: Partial<Profile>) => setP((prev) => ({ ...prev!, ...patch }));
   const save = async () => {
@@ -37,13 +37,8 @@ export default function ProfileEditor() {
   const age = p.birth_year ? year - p.birth_year : null;
 
   return (
-    <div className="card p-5 rise space-y-4">
-      <div>
-        <p className="eyebrow">Your details</p>
-        <p className="text-dim text-xs mt-1 leading-relaxed">
-          Powers the body-fat estimate, energy maths and the body figure. Stored privately on your own machine.
-        </p>
-      </div>
+    <div className="space-y-4">
+      <p className="t-sec leading-relaxed">Powers the body-fat estimate, energy maths and the body figure. Stored privately on your own machine.</p>
 
       <label className="block">
         <span className="text-dim text-xs">Sex</span>
