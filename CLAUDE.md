@@ -8,7 +8,7 @@ A personal weight-loss training app: a workout/nutrition logger with an AI coach
 - **Backend** (`coach/`): Python — FastAPI service, a LangGraph coach agent, a
   deterministic safety layer, an asyncpg Postgres data layer, RAG + eval modules.
 - **Frontend** (`web/`): Next.js 15 (App Router) PWA — installable, offline-capable,
-  five screens (Today, Trends, Fuel, Coach, Setup) + a first-run onboarding wizard.
+  five tabs (Home, Train, Food, Progress, Coach) + Setup + a first-run onboarding wizard.
 - Single-user by design (no multi-tenant billing/onboarding funnel), but auth is a
   real JWT boundary so it can open up later without a rewrite.
 
@@ -133,6 +133,11 @@ the user's Android phone over Tailscale at `https://gym-coach.taile8b1de.ts.net`
 running system (architecture, ports, services, LLM wiring, phone access, operations) for the
 next human/agent. Then [`deploy/README.md`](deploy/README.md) and
 [`deploy/PHONE_ACCESS.md`](deploy/PHONE_ACCESS.md).
+
+**UI (2026-09-12):** full redesign — five selectable looks (`web/lib/theme.ts` + `globals.css`
+token blocks), Home / Train / Food / Progress / Coach tabs, workout player, sheet-based logging.
+See `docs/SYSTEM_OVERVIEW.md` §8. Keep new UI on the tokens (`bg-ink`, `text-dim`, `text-onvolt`
+on accent, `t-*` type classes) so every look stays legible; never hardcode a colour.
 
 **Built since the original baseline:** food-database nutrition logging (Open Food Facts +
 barcode + servings/recent), adaptive calorie targets (2026-09), vitals (BP/HR), proactive coach insights, workout history,

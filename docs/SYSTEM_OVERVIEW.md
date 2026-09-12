@@ -152,19 +152,33 @@ Python backend uses the repo `.venv`. Secrets live in `.env` (gitignored).
 
 ## 8. Feature surface (so you know what exists)
 
-- **Today** — start/finish session, log sets (typeable weight/reps), edit/remove a logged set
-  in place, add ad-hoc exercises, program editor (`/program`), proactive coach insight card
-  (tappable → Coach, rotating focus), workout history (`/history`).
-- **Trends** — adherence bars, weight chart with **tap-a-point to edit/remove**, vitals card
-  (BP + heart rate, many/day, edit/remove, sparklines), energy card incl. the **adaptive
-  maintenance estimate** from the user's own logs (28d; shows confidence + evidence, or exactly what
-  to log next — never a suggested target).
-- **Fuel** — **food-database logging** (Open Food Facts search + **barcode scan** + recent
-  foods + servings/grams), per-day edit, macro summary (protein progress; calories shown
-  without verdicts — wellbeing-first), streak.
-- **Coach** — grounded chat (reads real logs, proposes→safety→commit), multi-chat history,
-  vitals-aware, markdown rendering.
-- **Setup** — token, **Edit program**, **Workout history**, **Export/backup** (JSON + CSV).
+**UI redesign (2026-09-12, four commits a46671f → 7c25db8).** Tabs are now **Home / Train / Food /
+Progress / Coach**, Setup sits behind the gear on Home. Five user-selectable **looks** (Volt,
+Paper, Ember, Glacier, Mono + Auto) are CSS-variable blocks on `<html data-theme>` (`web/lib/theme.ts`,
+`ThemePicker`, no-flash inline script in `layout.tsx`). Type: Bricolage Grotesque / IBM Plex Sans /
+IBM Plex Mono with a fixed scale (`t-hero/t-title/t-h2/t-sec/eyebrow`). Primitives in
+`web/components/ui/` (Sheet, Empty, Ring, PageHeader). Every log is a bottom sheet; no screen keeps a
+form open. Old components (SessionLogger, TrendsView, NutritionView, FoodLog, VitalsCard, InsightCard)
+are gone — see `Home`, `WorkoutPlayer`, `ProgressView`, `FoodView`/`FoodAddSheet`, `VitalsSection`,
+`CoachNote`. `/api/home` feeds Home in one call; `/api/trends` adds `latest_weight`.
+The screen list below describes the redesigned surface.
+
+- **Home** (`/`) — greeting, today's workout as one lifted object (count, ~minutes, set pills,
+  Start/Continue), quick-log tiles (weigh-in + BP sheets, food), one-line coach note, compact
+  plan list, this-week tiles. **Workout player** (`/workout`) — one exercise at a time, big
+  fields, rest timer, prev/next, all-exercises + add sheets, PR flag, finish summary.
+  **Train** (`/train`) — program library (cards, on/off, day chips, add/review sheets) +
+  History (`/history`, sessions → sets, edit via sheet); per-program editor at `/program?id=`.
+- **Progress** (`/trends`) — weight hero (latest/last-known, goal distance, honest trend or
+  building note, tap-a-point edit sheet), week tiles, energy balance (adaptive estimate +
+  confidence, or what's still needed — never a suggested target), vitals (sparklines, edit
+  sheet), body measurements + photos as expandable sections, '+' log sheet.
+- **Food** (`/nutrition`) — protein ring + plain calories, 7-day strip (tap a day), today's
+  entries, one add sheet (search / recent / saved meals, barcode, photo, or a day total).
+- **Coach** — identity mark, verdict-first weekly review, suggested prompts, prose replies +
+  evidence chips, history/confirm sheets; grounded chat (reads real logs, proposes→safety→commit).
+- **Setup** — Look picker, Your details + Access token rows (sheets), sync, reminders, Health
+  Connect (native), export/backup.
 - **Onboarding** — 5-step wizard with optional baseline vitals.
 - **Knowledge** — `/knowledge/ask` cited answers over a vetted RAG corpus (CDC/NHS/MedlinePlus/
   OpenStax, ~257 chunks, governance-gated, openly-licensed).
