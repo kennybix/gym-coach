@@ -1,6 +1,6 @@
 [Unit]
 Description=Gym Coach — (re)assert Tailscale serve on the dedicated node
-After=network-online.target gym-coach-tailscaled.service coach-frontend.service
+After=network-online.target gym-coach-tailscaled.service coach-frontend.service coach-ntfy.service
 Wants=network-online.target
 Requires=gym-coach-tailscaled.service
 
@@ -8,9 +8,10 @@ Requires=gym-coach-tailscaled.service
 Type=oneshot
 RemainAfterExit=yes
 # The dedicated tailscaled persists serve config across restarts; this re-asserts it.
-# Maps https://gym-coach.<tailnet>.ts.net/ -> the gym frontend (:3010), which proxies the API.
+# Maps https://gym-coach.<tailnet>.ts.net/ -> the gym frontend (:3010), which proxies the API,
+# and https://gym-coach.<tailnet>.ts.net:8443 -> the ntfy push server (:2586, coach-ntfy.service).
 # The node must be authed once: tailscale --socket=<sock> up --hostname=gym-coach
-ExecStart=/bin/sh -c 'S=%h/.local/share/tailscale-gym-coach/tailscaled.sock; for i in 1 2 3 4 5 6; do /usr/bin/tailscale --socket="$S" status >/dev/null 2>&1 && break; sleep 5; done; /usr/bin/tailscale --socket="$S" serve --bg http://127.0.0.1:3010 || true'
+ExecStart=/bin/sh -c 'S=%h/.local/share/tailscale-gym-coach/tailscaled.sock; for i in 1 2 3 4 5 6; do /usr/bin/tailscale --socket="$S" status >/dev/null 2>&1 && break; sleep 5; done; /usr/bin/tailscale --socket="$S" serve --bg http://127.0.0.1:3010 || true; /usr/bin/tailscale --socket="$S" serve --bg --https=8443 http://127.0.0.1:2586 || true'
 
 [Install]
 WantedBy=default.target

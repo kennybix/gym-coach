@@ -1,8 +1,10 @@
 [Unit]
-Description=Gym Coach — weekly review schedule (Mondays 07:00)
+Description=Gym Coach — weekly review, checked daily (07:00); runs once per ISO week per user
 
 [Timer]
-OnCalendar=Mon 07:00
+# Daily, not weekly: the service runs with --if-missing, so Monday does the work and any later day
+# catches up if Monday failed (e.g. every AI model rate-limited). No manual re-run ever needed.
+OnCalendar=*-*-* 07:00
 # Catch up a run missed because the machine was off/asleep.
 Persistent=true
 Unit=coach-review.service

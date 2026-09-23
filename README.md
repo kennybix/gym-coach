@@ -110,9 +110,11 @@ This is health-adjacent software, so the model is deliberately not in charge.
   (five looks, a fixed type scale in Bricolage Grotesque / IBM Plex Sans / IBM Plex Mono, sheet
   and ring primitives), an IndexedDB write queue that replays on reconnect, and a Capacitor
   Android shell for Health Connect.
-- **LLM** — chat on **GPT-5.5 through a local OpenAI-compatible CLI proxy** (subscription-backed,
-  no per-token cost); **embeddings** through a **LiteLLM → Ollama** gateway running
-  `mxbai-embed-large` locally. Provider-agnostic via `init_chat_model`.
+- **LLM** — a ranked **failover chain** (`coach/llm.py`: gpt-5.5 → claude-sonnet-5 →
+  gemini-3.8-flash) through a local OpenAI-compatible CLI proxy (subscription-backed, no per-token
+  cost). It remembers provider cooldowns, skips rate-limited models instantly, and when every model
+  is out the app says when the coach is back. **Embeddings** go through a **LiteLLM → Ollama**
+  gateway running `mxbai-embed-large` locally.
 - **Knowledge** — 257 chunks from openly-licensed sources (CDC, NHS, MedlinePlus, OpenStax),
   governance-gated, answers always cited.
 
@@ -151,18 +153,21 @@ For the always-on setup on this machine (systemd units, weekly review, nightly b
 ## On your phone
 
 Served **tailnet-only** over HTTPS by Tailscale Serve — private to your own devices, nothing
-public, no credentials in the JS bundle. Install it as a PWA, or sideload the Capacitor APK to
-get Health Connect import and local notifications. Steps:
-[`deploy/PHONE_ACCESS.md`](deploy/PHONE_ACCESS.md) and
-[`deploy/ANDROID_APP.md`](deploy/ANDROID_APP.md); post-install checklist:
+public, no credentials in the JS bundle. Run **`python pair.py`** and scan three QR codes: install
+the Android app, subscribe to push notifications, and sign in. The app is a thin native shell
+around the live site (so UI updates need no reinstall) with Health Connect auto-sync, home-screen
+shortcuts and notification taps that open the right screen. The server reaches you through a
+self-hosted **ntfy**: the weekly review, a calm morning nudge, and an alert if a job fails. Steps:
+[`deploy/PHONE_ACCESS.md`](deploy/PHONE_ACCESS.md), [`deploy/ANDROID_APP.md`](deploy/ANDROID_APP.md),
+[`deploy/NOTIFICATIONS.md`](deploy/NOTIFICATIONS.md); post-install checklist:
 [`deploy/DEVICE_SMOKE.md`](deploy/DEVICE_SMOKE.md).
 
 ## Tests
 
 ```bash
-python -m pytest coach/tests -q                 # 90 unit/integration tests, no DB or LLM needed
+python -m pytest coach/tests -q                 # 117 unit/integration tests, no DB or LLM needed
 COACH_DB_URI=... python -m pytest coach/tests -q    # +8 DB integration tests (throwaway user)
-cd web && npm test                              # Vitest: the offline queue
+cd web && npm test                              # Vitest: offline queue, QR pairing, deep links
 cd web && TK=$(python ../mint_token.py <uuid> | awk '/token:/{print $2}') npm run test:e2e
                                                 # Playwright: read-only pass over every screen
 COACH_DB_URI=... COACH_SEED_DIR=... python -m coach.smoke_test   # data layer vs live Postgres

@@ -16,7 +16,6 @@ from typing import Optional
 import openai
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
@@ -26,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import api as rest_api
 from .auth import get_current_user_id, require_jwt_secret
-from . import energy, media
+from . import energy, llm, media
 from .graph import build_coach_graph, summarize_evidence
 from .parse import parse_workout
 from .vision import parse_food_photo
@@ -35,7 +34,8 @@ from .review import build_review_graph
 from .pg_repo import PostgresCoachRepo
 
 DB_URI = os.environ["COACH_DB_URI"]
-MODEL_ID = os.environ.get("COACH_MODEL", "google_genai:gemini-3.5-flash")
+# Ranked model list with failover — see coach/llm.py. COACH_MODELS, else COACH_MODEL.
+MODELS = llm.configured_models()
 SEED_DIR = os.environ.get("COACH_SEED_DIR", "./seed")
 
 _state: dict = {}
@@ -51,9 +51,11 @@ async def lifespan(app: FastAPI):
         rest_api.bind_repo(repo)
         _state["repo"] = repo
         try:
-            _state["chat"] = build_coach_graph(repo, checkpointer=saver, model_id=MODEL_ID)
-            _state["review"] = build_review_graph(repo, model_id=MODEL_ID)
-            _state["insight_model"] = init_chat_model(MODEL_ID, temperature=0.3)
+            coach_model = llm.build_model(temperature=0.2)
+            _state["chat"] = build_coach_graph(repo, checkpointer=saver, model=coach_model)
+            _state["review"] = build_review_graph(repo, model=coach_model)
+            _state["insight_model"] = llm.build_model(temperature=0.3)
+            logging.info("coach models (in failover order): %s", ", ".join(coach_model.names))
         except Exception as exc:  # missing provider pkg/key must not kill the logging API
             logging.warning("coach graphs unavailable (LLM not configured): %s", exc)
             _state["chat"] = None
@@ -68,12 +70,30 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+def _unavailable_body(retry_at: float | None) -> dict:
+    """503 payload. `retry_at` (ISO, UTC) lets the UI say when the coach is back instead of
+    pretending a multi-day provider cooldown is a blip."""
+    from datetime import datetime, timezone
+    iso = datetime.fromtimestamp(retry_at, timezone.utc).isoformat() if retry_at else None
+    detail = ("The coach is offline — every AI model it can use is rate-limited right now. "
+              "Logging still works.") if iso else (
+              "The coach couldn't reach an AI model just now. Logging still works; try again in a "
+              "few minutes.")
+    return {"detail": detail, "retry_at": iso}
+
+
+@app.exception_handler(llm.CoachUnavailable)
+async def _all_models_down(request, exc: llm.CoachUnavailable):
+    # Every model in COACH_MODELS failed -> graceful 503 (logging endpoints are unaffected).
+    logging.warning("coach unavailable -> 503: %s", exc)
+    return JSONResponse(status_code=503, content=_unavailable_body(exc.retry_at))
+
+
 @app.exception_handler(openai.APIError)
 async def _llm_unavailable(request, exc):
-    # LLM provider hiccup (rate-limit/cooldown, connection, upstream error) -> graceful 503, not a
-    # hard 500. The PWA already treats coach 503s as "coach unavailable" instead of crashing.
+    # A provider error that escaped the failover wrapper -> graceful 503, not a hard 500.
     logging.warning("coach LLM unavailable -> 503: %s", exc)
-    return JSONResponse(status_code=503, content={"detail": "coach temporarily unavailable — the model is busy, try again shortly"})
+    return JSONResponse(status_code=503, content=_unavailable_body(None))
 
 
 app.include_router(rest_api.router)
@@ -326,6 +346,25 @@ async def run_review(body: ReviewIn, user_id: str = Depends(get_current_user_id)
 
 # Proactive "here's what I noticed" note for Home. Cached per user with a short
 # TTL so it isn't regenerated on every open (in-memory: fine for this single-host app).
+@app.get("/coach/status")
+async def coach_status(user_id: str = Depends(get_current_user_id)):
+    """Which model is serving, and when the coach is back if none is. No LLM call — the UI can
+    poll this cheaply to explain an outage honestly."""
+    from datetime import datetime, timezone
+    if _state.get("chat") is None:
+        return {"configured": False, "available": False, "active_model": None, "retry_at": None, "models": []}
+    st = llm.status()
+    iso = lambda t: datetime.fromtimestamp(t, timezone.utc).isoformat() if t else None  # noqa: E731
+    return {
+        "configured": True,
+        "available": st["available"],
+        "active_model": st["active_model"],
+        "retry_at": iso(st["retry_at"]),
+        "models": [{**m, "cooling_until": iso(m["cooling_until"]), "last_ok": iso(m["last_ok"])}
+                   for m in st["models"]],
+    }
+
+
 _insight_cache: dict = {}
 _INSIGHT_TTL = 6 * 3600
 

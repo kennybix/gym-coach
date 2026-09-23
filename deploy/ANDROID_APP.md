@@ -1,45 +1,70 @@
-# Gym Coach — native Android app (Health Connect sync)
+# Gym Coach — the Android app
 
-A PWA can't read **Health Connect** (it's on-device only), so to auto-import weight / blood
-pressure / resting heart rate we ship a thin **native Android shell** via Capacitor. It bundles
-the static web export and talks to the backend over Tailscale — same app, same data.
+A PWA can't read **Health Connect**, register home-screen shortcuts, or open from a `gymcoach://`
+link, so there's a thin **native Android shell** built with Capacitor (`com.gymcoach.app`).
 
-## Architecture
-- **`NATIVE_BUILD=1 next build`** → static export (`web/out`) with the tailnet API URL baked in
-  (`NEXT_PUBLIC_API_URL`). No Next server in the app, so it calls the backend directly; backend
-  CORS allows `https://localhost` (the Capacitor origin).
-- **Capacitor** (`com.gymcoach.app`) wraps `web/out` into an Android APK (`web/android/`).
-- **Health Connect bridge** (`web/lib/health.ts`, native-only) reads Weight / BloodPressure /
-  RestingHeartRate and pushes them through the normal idempotent endpoints (weight = per-day
-  upsert; vitals keyed by the Health Connect record id). Triggered from **Setup → Sync from
-  Health Connect** (only shown on the native app).
-- **Looks, sheets and the workout player** are the same web build, so the APK picks up every
-  UI change automatically — no native work needed for UI.
+## Architecture: a native shell around the live site
 
-## Build
+- The WebView loads the **deployed site** (`server.url` = `COACH_PUBLIC_URL`, e.g.
+  `https://gym-coach.<your-tailnet>.ts.net`). Every UI deploy reaches the phone on the next app
+  open — **no reinstall for UI changes.**
+  *(It used to bundle a static export of the UI at build time. In practice the phone ran a
+  two-month-old build and never showed the 2026-09 redesign. Don't go back to bundling.)*
+- Native plugins keep working through the Capacitor bridge: Health Connect
+  (`@kiwi-health/capacitor-health-connect`), camera, local notifications, status bar, and
+  `@capacitor/app` for deep links.
+- **Offline page:** if the server can't be reached (Tailscale off, desktop asleep) the shell shows
+  `web/native-shell/offline.html` with a *Try again* button instead of a WebView error.
+- **Deep links:** the manifest registers the `gymcoach://` scheme; `web/components/NativeShell.tsx`
+  routes them (`web/lib/deeplinks.ts`), including on a cold start:
+
+  | Link | Opens |
+  |---|---|
+  | `gymcoach://log/weight` · `gymcoach://log/bp` | Home with the weigh-in / blood-pressure sheet open |
+  | `gymcoach://workout` · `gymcoach://food` · `gymcoach://coach` | that screen |
+  | `gymcoach://pair?t=<token>` | signs the app in |
+
+- **Home-screen shortcuts** (long-press the icon): Weigh in · Start workout · Log food · Log blood
+  pressure (`res/xml/shortcuts.xml`), each a `gymcoach://` link.
+- **Health Connect:** the first sync is manual (**Setup → Sync from Health Connect**, which asks for
+  permissions). After that, new weigh-ins, blood pressure and resting HR sync **silently whenever
+  the app comes to the foreground**, at most every 6 hours — a smart scale or Samsung Health means
+  zero-tap weigh-ins.
+
+## Build and publish
+
 ```bash
 bash deploy/build-apk.sh
-# then RESTORE the server build — see the warning below
-(cd web && npm run build) && systemctl --user restart coach-frontend
 ```
 
-> **The APK build clobbers the served site.** `build-apk.sh` runs `NATIVE_BUILD=1 next build`,
-> which replaces `.next` with a static export that has the tailnet API URL baked in. Always
-> re-run `npm run build` and restart `coach-frontend` afterwards, or the PWA at
-> `https://gym-coach.<your-tailnet>.ts.net` becomes that export.
+It runs `cap sync` + Gradle, copies the APK to `web/public/gym-coach.apk`, rebuilds the site so
+Next serves the new file, and restarts `coach-frontend`. It no longer touches the site's own build.
+
+**Rebuild the APK only when native parts change** (plugins, manifest, shortcuts, offline page).
+
 Toolchain (one-time): Android SDK at `~/Android` (cmdline-tools + `platforms;android-36` +
-`build-tools;36.0.0`), and a **full JDK 21** at `~/jdk` (the system Java is a JRE — no `javac`).
+`build-tools;36.0.0`) and a **full JDK 21** at `~/jdk`. Version pins that matter: **AGP 8.9.1**,
+**compileSdk/targetSdk 36**, **minSdk 26** (Health Connect); the kiwi plugin's Kotlin is bumped to
+**1.9.25** with **jvmTarget 17** via `web/patches/` (patch-package).
 
-Version pins that matter (chased during bring-up): **AGP 8.9.1**, **compileSdk/targetSdk 36**,
-**minSdk 26** (Health Connect), build on **JDK 21**, but the kiwi Health Connect plugin's Kotlin
-bumped to **1.9.25** with **jvmTarget 17** (captured in `web/patches/` via patch-package).
+## Install on the phone
 
-## Sideload onto the phone
-1. `(cd web && npm run build) && systemctl --user restart coach-frontend` — serves the APK
-   (Next serves `public/` only for files present at build time).
-2. On the S26+ (Tailscale on): open **https://gym-coach.<your-tailnet>.ts.net/gym-coach.apk**, let
-   Chrome download it, tap to install (allow "install unknown apps" once).
-3. Open the app → **Setup → Sync from Health Connect** → grant the weight/BP/HR read permissions.
+Run `python pair.py` on the computer and scan code **1** (download), then code **3** (sign in)
+with the app's **Scan pairing code** button. Installing over an older build works (same debug
+signing key since June 2026); you'll sign in once more because the app now loads a different
+origin.
 
-> Debug-signed APK (fine for personal sideloading; not Play-Store distributable as-is). The
-> first Health Connect sync needs you to grant permissions in the Health Connect consent screen.
+## Testing on the emulator (before handing over an APK)
+
+```bash
+~/Android/emulator/emulator -avd readapage -no-window -no-audio &
+adb reverse tcp:3010 tcp:3010                       # localhost is a secure context in the WebView
+APK_SERVER_URL=http://localhost:3010 bash deploy/build-apk.sh    # test build, not published
+adb install -r web/android/app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -a android.intent.action.VIEW -d "gymcoach://log/weight" com.gymcoach.app
+adb exec-out screencap -p > shot.png
+```
+
+Point `APK_SERVER_URL` at a dead port (e.g. `http://localhost:3999`) to see the offline page.
+
+> Debug-signed APK — fine for personal sideloading, not Play-Store distributable as-is.

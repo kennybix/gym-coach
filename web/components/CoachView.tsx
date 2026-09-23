@@ -4,7 +4,7 @@
    confirmations are sheets. Transcript persistence is unchanged. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  coachChat, coachConfirm, coachLatestReview, coachThreadMessages, coachThreads, configured,
+  coachChat, coachConfirm, coachLatestReview, coachThreadMessages, coachThreads, configured, offlineMessage,
   type CoachReply, type Review,
 } from "@/lib/api";
 import Markdown from "@/components/Markdown";
@@ -124,7 +124,7 @@ export default function CoachView() {
   }, [activeId]);
 
   const handle = useCallback((r: CoachReply) => {
-    if (r.kind === "unavailable") pushMsg({ role: "system", text: "The coach is offline right now. Logging still works." });
+    if (r.kind === "unavailable") pushMsg({ role: "system", text: offlineMessage(r.retryAt) });
     else if (r.kind === "reply") pushMsg({ role: "coach", text: r.text, evidence: r.evidence });
     else setConfirm({ reason: r.payload.reason, diff: r.payload.diff });
   }, [pushMsg]);

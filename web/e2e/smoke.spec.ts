@@ -85,6 +85,18 @@ test("Onboarding wizard renders and steps without saving", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Your goal" })).toBeVisible();
 });
 
+test("Pairing page rejects a bad code and never keeps it in the URL", async ({ page }) => {
+  await page.goto("/pair#t=not-a-real-token");
+  await expect(page.getByRole("heading", { name: "That code didn't work" })).toBeVisible();
+  expect(page.url()).not.toContain("not-a-real-token");
+});
+
+test("Setup offers QR pairing", async ({ page }) => {
+  await page.goto("/settings");
+  await page.getByText("Signed in").click();
+  await expect(page.getByRole("button", { name: "Scan pairing code" })).toBeVisible();
+});
+
 test("Setup shows token field + expiry", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByText("Signed in")).toBeVisible();

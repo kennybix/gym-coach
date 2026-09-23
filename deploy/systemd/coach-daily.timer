@@ -1,0 +1,10 @@
+[Unit]
+Description=Gym Coach — daily morning nudge (08:30)
+
+[Timer]
+OnCalendar=*-*-* 08:30
+Persistent=true
+Unit=coach-daily.service
+
+[Install]
+WantedBy=timers.target

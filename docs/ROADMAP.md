@@ -1,7 +1,7 @@
 # Gym Coach — Improvement Roadmap
 
-**Status at 2026-09-12:** Phase 1 ✅ shipped · Phase 2 ✅ shipped · Phase 3 mostly shipped
-(see its section) · a full **UI redesign** shipped on top of all three. What's actually left is
+**Status at 2026-09-22:** Phase 1 ✅ · Phase 2 ✅ · Phase 3 mostly shipped · Phase 4 (UI
+redesign) ✅ · Phase 5 (reliability and re-engagement) ✅. What's actually left is
 short: **import/restore**, **repeat-last-workout**, **rest-timer notifications**, and the
 pre-launch items (clinician sign-off, always-on hosting). Screen-by-screen UI decisions live in
 [`SYSTEM_OVERVIEW.md` §8](SYSTEM_OVERVIEW.md) and the UI invariants in [`../CLAUDE.md`](../CLAUDE.md).
@@ -151,6 +151,31 @@ a target number), and nutrition depth (full macros, saved meals, photo logging).
 - ⬜ **Rest-timer notifications** — the timer is in-app only; it doesn't fire a notification if
   you leave the app mid-rest.
 - ⬜ Widgets; later Watch / Wear OS.
+
+---
+
+# Phase 5 — Reliability and re-engagement  ✅ SHIPPED 2026-09-22
+
+A review after ten days of unattended running found the product dormant for reasons no test
+caught: the phone was **locked out** (a secret rotation, and re-pasting a JWT by hand was the only
+way back), the **coach was down for days** (one model in a 128-hour provider cooldown, the weekly
+review crashing silently), the phone was running a **two-month-old bundled UI**, and **nothing ever
+reached out** — four straight reviews said *insufficient data*.
+
+- ✅ **QR pairing** — `python pair.py` + **Scan pairing code** in the app (Home, Setup, the
+  signed-out banner) and a `/pair` page for the camera path.
+- ✅ **Model failover** — `COACH_MODELS` chain with cooldown memory, function-calling structured
+  output, `/coach/status`, and "offline until about Thursday" instead of "try again shortly".
+- ✅ **Self-healing jobs** — the review timer runs daily with `--if-missing`; `OnFailure=` pushes an
+  alert; stale open sessions are closed nightly.
+- ✅ **The server reaches the phone** — self-hosted ntfy on the tailnet: the weekly review, a calm
+  morning nudge (never a weigh-in prompt for ED history; Mondays only after 14 quiet days).
+- ✅ **Two-tap logging** — the Android app loads the live site (no more stale bundles), with
+  `gymcoach://` deep links, home-screen shortcuts, notification taps onto the right sheet, silent
+  Health Connect sync, and an offline page.
+
+**Still open here:** the active program is 16 exercises / ~100 minutes, every day — a likely reason
+sessions don't start. Worth a coach-assisted rethink (shorter default sessions, or split days).
 
 ---
 

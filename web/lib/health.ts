@@ -75,3 +75,35 @@ export async function syncHealthConnect(days = 90): Promise<HealthSync> {
     return { error: e instanceof Error ? e.message : "sync_failed" };
   }
 }
+
+/* ---- silent background sync -------------------------------------------------------------------
+   Only after the user has synced once by hand (so permissions are granted and we never pop a
+   permission screen on app open), and at most every 6 hours. Pulls the last 14 days; the endpoints
+   are idempotent so overlap is harmless. */
+const AUTO_KEY = "hc_auto";          // "1" once a manual sync succeeded
+const LAST_KEY = "hc_last_sync";     // epoch ms of the last successful sync
+const AUTO_EVERY_MS = 6 * 3600 * 1000;
+
+export function markHealthSynced() {
+  try {
+    localStorage.setItem(AUTO_KEY, "1");
+    localStorage.setItem(LAST_KEY, String(Date.now()));
+  } catch { /* ignore */ }
+}
+
+export async function autoSyncHealth(): Promise<HealthSync | null> {
+  if (!isNative()) return null;
+  try {
+    if (localStorage.getItem(AUTO_KEY) !== "1") return null;
+    const last = Number(localStorage.getItem(LAST_KEY) || 0);
+    if (Date.now() - last < AUTO_EVERY_MS) return null;
+    localStorage.setItem(LAST_KEY, String(Date.now())); // claim the slot before the slow work
+  } catch {
+    return null;
+  }
+  const r = await syncHealthConnect(14);
+  if (!("error" in r) && (r.weights || r.vitals)) {
+    window.dispatchEvent(new CustomEvent("coach:health-synced", { detail: r }));
+  }
+  return r;
+}

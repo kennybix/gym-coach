@@ -4,4 +4,8 @@
     <string name="title_activity_main">Gym Coach</string>
     <string name="package_name">com.gymcoach.app</string>
     <string name="custom_url_scheme">com.gymcoach.app</string>
+    <string name="shortcut_weigh_in">Weigh in</string>
+    <string name="shortcut_workout">Start workout</string>
+    <string name="shortcut_food">Log food</string>
+    <string name="shortcut_bp">Log blood pressure</string>
 </resources>

@@ -1,0 +1,11 @@
+[Unit]
+Description=Gym Coach — daily morning nudge + housekeeping
+After=network-online.target coach-ntfy.service
+OnFailure=coach-alert@%n.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Documents/Projects/gym-coach
+EnvironmentFile=%h/Documents/Projects/gym-coach/.env
+ExecStart=%h/Documents/Projects/gym-coach/.venv/bin/python -m coach.daily
+Nice=10

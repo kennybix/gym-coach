@@ -5,14 +5,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "build:native": "NATIVE_BUILD=1 NEXT_PUBLIC_API_URL=${COACH_PUBLIC_URL:?set COACH_PUBLIC_URL to the URL the app is served from, e.g. https://gym-coach.your-tailnet.ts.net} next build",
-    "native:sync": "npm run build:native && npx cap sync android",
     "postinstall": "patch-package",
     "test": "vitest run",
     "test:e2e": "playwright test"
   },
   "dependencies": {
     "@capacitor/android": "^7.6.6",
+    "@capacitor/app": "^7.1.2",
     "@capacitor/camera": "^7.0.5",
     "@capacitor/cli": "^7.6.6",
     "@capacitor/core": "^7.6.6",

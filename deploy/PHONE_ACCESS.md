@@ -9,7 +9,7 @@ Tailscale node — `gym-coach-tailscaled` + `gym-coach-serve` units, mirroring m
 
 Already done (app side, verified):
 - Single origin — the frontend proxies `/api`,`/coach`,`/knowledge` to the backend.
-- No credentials in the JS bundle (token is entered once on the device).
+- No credentials in the JS bundle — the phone is signed in by scanning a QR code from `pair.py`.
 - Backend, frontend, LiteLLM run as systemd services (auto-start at boot).
 
 ## 3 steps for you
@@ -36,30 +36,26 @@ You should see `https://gym-coach.<your-tailnet>.ts.net → http://127.0.0.1:301
 (`deploy/tailscale-serve.sh` is the retired shared-node version — don't run it; it would reset
 the other app's serve config.)
 
-### 3. On the S26+
-1. Install **Tailscale** from the Play Store, sign in with **the same account as this machine**, toggle it **on**.
-2. Open **`https://gym-coach.<your-tailnet>.ts.net`** in Chrome.
-3. Tap the **gear** on Home → **Signed in** → paste your **bearer token** (below) → **Save**.
-   (Leave "Server URL" blank — it uses the site automatically.)
-4. Chrome menu → **Add to Home screen** to install the PWA. Open it from the icon —
-   full-screen, offline-capable, and barcode-camera works (real HTTPS).
-5. First run walks you through a five-step wizard; it opens by letting you pick a **look**
-   (Volt, Paper, Ember, Glacier, Mono, or Auto — changeable any time under Setup → Look).
+### 3. On the phone
 
-**Your token** — mint one on this machine and paste it into the app; never commit it, and
-never screenshot the Setup screen with it visible:
-```bash
-set -a; . ./.env; set +a
-python mint_token.py <your-user-uuid>
-```
+1. Install **Tailscale** from the Play Store, sign in with **the same account as this machine**,
+   and switch it **on**.
+2. On the computer, in the gym-coach folder, run **`python pair.py`**. It shows three QR codes:
+   1. **Install the app** — downloads the Android app (recommended: Health Connect, shortcuts,
+      notification taps open it directly). Or skip it and use the site in Chrome, then
+      **Add to Home screen** to install the PWA.
+   2. **Notifications** — install **ntfy** from the Play Store first, then scan to subscribe to
+      your private topic (weekly review, morning nudges, alerts). See
+      [`NOTIFICATIONS.md`](NOTIFICATIONS.md).
+   3. **Sign in** — in the app tap **Scan pairing code** (on Home when signed out, or
+      Setup → Signed in) and scan. Scanning with the phone's camera instead opens the site in the
+      browser and signs that in.
+3. The first run walks you through a five-step setup; it opens by letting you pick a **look**.
 
-## Or install the Android app
-
-The PWA covers everything except **Health Connect import** and **local notifications**, which
-need the native shell. To sideload it: `bash deploy/build-apk.sh`, restore the server build
-(`(cd web && npm run build) && systemctl --user restart coach-frontend`), then download
-`https://gym-coach.<your-tailnet>.ts.net/gym-coach.apk` on the phone. Details:
-[`ANDROID_APP.md`](ANDROID_APP.md). After installing, run [`DEVICE_SMOKE.md`](DEVICE_SMOKE.md).
+**The sign-in code is your login** — don't share it or screenshot it. If you ever rotate
+`SUPABASE_JWT_SECRET`, every device is signed out; run `python pair.py --sign-in` and scan again.
+(That rotation once locked the phone out for ten days because re-pasting a 195-character token by
+hand was the only way back in. Pairing by QR exists so that can't happen again.)
 
 ## Notes
 - **Availability:** the app is up only while this machine is on/awake (the LLM lives here).

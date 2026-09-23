@@ -13,6 +13,7 @@ import ExerciseAnimation from "./ExerciseAnimation";
 import ExerciseDetail from "./ExerciseDetail";
 import { VitalsSheet, WeighInSheet } from "./QuickLog";
 import Empty from "./ui/Empty";
+import PairButton from "./PairButton";
 
 const SKEY = "active_session_v2";
 type ActiveSession = { id: string; startedAt: string; logged: { slotId: string }[]; adhoc: ProgramSlot[] };
@@ -62,14 +63,38 @@ export default function Home() {
 
   useEffect(() => {
     load();
+    // A session left open for over 12h is stale (the server's daily job closes it too): finish it
+    // quietly instead of showing "Continue workout" for a workout that ended days ago.
+    const s0 = loadSession();
+    if (s0 && Date.now() - Date.parse(s0.startedAt) > 12 * 3600e3) {
+      if (s0.logged.length) void enqueue("/api/sessions/complete", { session_id: s0.id, completed_at: new Date().toISOString() });
+      localStorage.removeItem(SKEY);
+    }
+    // Deep links from notifications / app shortcuts: /?log=weight | /?log=bp opens the sheet.
+    const want = new URLSearchParams(window.location.search).get("log");
+    if (want === "weight" || want === "bp") {
+      setSheet(want === "weight" ? "weight" : "vitals");
+      window.history.replaceState(null, "", "/");
+    }
     setSession(loadSession());
+    window.addEventListener("coach:health-synced", load);
+    const openSheet = (e: Event) => {
+      const k = (e as CustomEvent).detail;
+      setSheet(k === "weight" ? "weight" : k === "bp" ? "vitals" : null);
+    };
+    window.addEventListener("coach:open-sheet", openSheet);
     // first run: nobody else routes a fresh token to the wizard
     if (configured() && localStorage.getItem("coach_onboarded") !== "1") {
       apiGet<{ onboarded: boolean }>("/api/onboarding/status")
         .then((d) => { if (d.onboarded) localStorage.setItem("coach_onboarded", "1"); else router.replace("/onboarding"); })
         .catch(() => {});
     }
-    return subscribeQueue(setQueued);
+    const unsub = subscribeQueue(setQueued);
+    return () => {
+      unsub();
+      window.removeEventListener("coach:health-synced", load);
+      window.removeEventListener("coach:open-sheet", openSheet);
+    };
   }, [load, router]);
 
   const start = useCallback(() => {
@@ -113,8 +138,10 @@ export default function Home() {
       </header>
 
       {state === "unconfigured" && (
-        <div className="card p-5 rise">
-          <Empty line="Paste your access token once and everything goes live." action="Open Setup" href="/settings" compact />
+        <div className="card-lift p-5 rise space-y-3">
+          <p className="t-h2">Pair this phone</p>
+          <p className="t-sec leading-relaxed">On your computer, in the gym-coach folder, run <span className="font-mono text-bone">python pair.py</span> and scan the code it shows.</p>
+          <PairButton className="btn btn-primary w-full h-14 text-base" />
         </div>
       )}
       {state === "error" && (

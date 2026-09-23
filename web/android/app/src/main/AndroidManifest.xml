@@ -23,6 +23,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- gymcoach:// deep links: notification taps, home-screen shortcuts, QR pairing.
+                 Routed in web/components/NativeShell.tsx via @capacitor/app appUrlOpen. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="gymcoach" />
+            </intent-filter>
+
+            <!-- Long-press the app icon: Weigh in / Start workout / Log food -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+
             <!-- Health Connect permissions rationale (Android 13 / Health Connect app) -->
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />

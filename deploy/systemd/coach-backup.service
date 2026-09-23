@@ -3,6 +3,8 @@ Description=Gym Coach — nightly Postgres backup
 Wants=postgresql.service
 After=postgresql.service
 
+OnFailure=coach-alert@%n.service
+
 [Service]
 Type=oneshot
 WorkingDirectory=%h/Documents/Projects/gym-coach

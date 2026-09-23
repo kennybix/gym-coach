@@ -18,7 +18,6 @@ import os
 
 from typing import Annotated, Literal, Optional, TypedDict
 
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import (
     AIMessage,
     AnyMessage,
@@ -33,7 +32,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.types import Command, interrupt
 
-from . import safety
+from . import llm, safety
 from .models import Profile, ProposedProgramChange, ProposedTargetChange, Targets
 from .repo import CoachRepo
 from .tools import build_propose_tools, build_read_tools
@@ -225,7 +224,7 @@ def build_coach_graph(repo: CoachRepo, checkpointer, model_id: str = "google_gen
     read_tools = build_read_tools(repo)
     propose_tools = build_propose_tools(repo)
     all_tools = read_tools + propose_tools
-    base_model = model if model is not None else init_chat_model(model_id, temperature=0.2)
+    base_model = model if model is not None else llm.build_model(temperature=0.2, models=[model_id])
     model = base_model.bind_tools(all_tools)
 
     async def hydrate(state: CoachState, config: RunnableConfig) -> dict:

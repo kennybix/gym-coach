@@ -7,9 +7,10 @@ import ProfileEditor from "@/components/ProfileEditor";
 import QueueStatus from "@/components/QueueStatus";
 import RemindersCard from "@/components/RemindersCard";
 import ThemePicker from "@/components/ThemePicker";
+import PairButton from "@/components/PairButton";
 import PageHeader from "@/components/ui/PageHeader";
 import Sheet from "@/components/ui/Sheet";
-import { isNative, syncHealthConnect } from "@/lib/health";
+import { isNative, markHealthSynced, syncHealthConnect } from "@/lib/health";
 import { apiGet, configured, tokenExpiry } from "@/lib/api";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -43,7 +44,8 @@ export default function SettingsPage() {
         : r.error === "NotSupported" ? "This device doesn't support Health Connect."
         : "Couldn't sync. Make sure you granted Health Connect access.");
     } else {
-      setHcMsg(`Imported ${r.weights} weigh-in${r.weights === 1 ? "" : "s"} and ${r.vitals} vitals reading${r.vitals === 1 ? "" : "s"}.`);
+      markHealthSynced(); // from now on new readings sync silently when the app opens
+      setHcMsg(`Imported ${r.weights} weigh-in${r.weights === 1 ? "" : "s"} and ${r.vitals} vitals reading${r.vitals === 1 ? "" : "s"}. New readings will now sync automatically.`);
     }
     setHcBusy(false);
   };
@@ -112,7 +114,9 @@ export default function SettingsPage() {
       </Sheet>
 
       <Sheet open={showToken} onClose={() => setShowToken(false)} eyebrow="Single-user app" title="Access token">
-        <p className="t-sec leading-relaxed">A JWT signed with your server's secret. Mint one with the repo's script and paste it here once.</p>
+        <p className="t-sec leading-relaxed">On your computer run <span className="font-mono text-bone">python pair.py</span>, then scan the code it shows.</p>
+        <div className="mt-4"><PairButton className="btn btn-primary w-full h-14 text-base" /></div>
+        <p className="eyebrow mt-6">Or paste a token</p>
         <label className="block mt-4">
           <span className="eyebrow">Server URL · optional</span>
           <input value={base} onChange={(e) => setBase(e.target.value)} className="field mt-1.5 w-full h-12 px-4 text-sm tnum outline-none" placeholder="Automatic — leave blank" autoCapitalize="off" autoCorrect="off" spellCheck={false} />

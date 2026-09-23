@@ -4,7 +4,7 @@
    nothing when the coach is off or has nothing to say — never a placeholder paragraph. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { coachInsight, configured } from "@/lib/api";
+import { coachInsight, coachStatus, configured, whenBack } from "@/lib/api";
 
 const FOCUSES = ["auto", "weight", "training", "nutrition", "vitals"];
 
@@ -29,9 +29,18 @@ export default function CoachNote() {
   const [refreshing, setRefreshing] = useState(false);
   const focusIdx = useRef(0);
 
+  const [resting, setResting] = useState<string | null>(null);
+
   const fetchIt = useCallback((refresh: boolean) => {
     coachInsight(refresh, FOCUSES[focusIdx.current])
-      .then((d) => setNote(d?.note ?? null))
+      .then(async (d) => {
+        setNote(d?.note ?? null);
+        if (!d?.note) {
+          // No note: say so if it's because every model is rate-limited, rather than vanishing.
+          const st = await coachStatus();
+          setResting(st && st.configured && !st.available ? whenBack(st.retry_at) ?? "later" : null);
+        }
+      })
       .finally(() => {
         setLoading(false);
         setRefreshing(false);
@@ -61,7 +70,18 @@ export default function CoachNote() {
   };
 
   if (loading) return <div className="h-14 rounded-2xl bg-panel animate-pulse" />;
-  if (!note) return null;
+  if (!note) {
+    if (!resting) return null;
+    return (
+      <div className="flex items-start gap-3 rise opacity-80">
+        <CoachMark />
+        <p className="flex-1 min-w-0 t-sec leading-snug pt-1">
+          The coach is resting until {resting === "later" ? "a model frees up" : `about ${resting}`}: every AI model it
+          uses is rate-limited. Logging still works.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-start gap-3 rise">

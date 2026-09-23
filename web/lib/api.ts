@@ -192,7 +192,34 @@ export type Evidence = { label: string; detail: string };
 export type CoachReply =
   | { kind: "reply"; text: string; evidence?: Evidence[] }
   | { kind: "confirm"; payload: { proposal: unknown; reason: string; diff?: { label: string; from: string; to: string }[] } }
-  | { kind: "unavailable" };
+  | { kind: "unavailable"; retryAt?: string | null };
+
+/* When is the coach back? The server knows each model's provider cooldown (coach/llm.py). */
+export function whenBack(retryAt?: string | null): string | null {
+  if (!retryAt) return null;
+  const t = new Date(retryAt);
+  if (Number.isNaN(t.getTime()) || t.getTime() <= Date.now()) return null;
+  const sameDay = t.toDateString() === new Date().toDateString();
+  return sameDay
+    ? t.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : t.toLocaleString(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" });
+}
+
+export function offlineMessage(retryAt?: string | null): string {
+  const when = whenBack(retryAt);
+  return when
+    ? `The coach is offline until about ${when} — every AI model it can use is rate-limited. Logging still works.`
+    : "The coach couldn't reach an AI model just now. Logging still works — try again in a few minutes.";
+}
+
+export type CoachStatus = { configured: boolean; available: boolean; active_model: string | null; retry_at: string | null };
+export async function coachStatus(): Promise<CoachStatus | null> {
+  try {
+    return await apiGet<CoachStatus>("/coach/status");
+  } catch {
+    return null;
+  }
+}
 
 async function coachPost(path: string, body: unknown): Promise<CoachReply> {
   const res = await fetch(`${apiBase()}${path}`, {
@@ -200,7 +227,10 @@ async function coachPost(path: string, body: unknown): Promise<CoachReply> {
     headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (res.status === 503) return { kind: "unavailable" };
+  if (res.status === 503) {
+    const b = await res.json().catch(() => ({}));
+    return { kind: "unavailable", retryAt: b.retry_at ?? null };
+  }
   if (!res.ok) throw new Error(`POST ${path} -> ${res.status}`);
   const d = await res.json();
   if (d.status === "needs_confirmation") return { kind: "confirm", payload: d.payload };

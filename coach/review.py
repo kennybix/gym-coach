@@ -17,10 +17,9 @@ from __future__ import annotations
 
 from typing import Optional, TypedDict
 
-from langchain.chat_models import init_chat_model
 from langgraph.graph import END, START, StateGraph
 
-from . import adaptive, safety
+from . import adaptive, llm, safety
 from .models import Profile, ProposedTargetChange, ReviewAssessment, Targets
 from .repo import CoachRepo
 
@@ -67,7 +66,7 @@ REVIEW_PROMPT = (
 
 
 def build_review_graph(repo: CoachRepo, model_id: str = "google_genai:gemini-3.5-flash", model=None):
-    base = model if model is not None else init_chat_model(model_id, temperature=0.2)
+    base = model if model is not None else llm.build_model(temperature=0.2, models=[model_id])
     assessor = base.with_structured_output(ReviewAssessment)
 
     async def gather(state: ReviewState) -> dict:

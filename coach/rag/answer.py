@@ -38,9 +38,12 @@ class FakeGenerator:
 class Generator:
     def __init__(self, model_id=None):
         import os
-        from langchain.chat_models import init_chat_model
-        model_id = model_id or os.environ.get("COACH_RAG_MODEL", "google_genai:gemini-3.5-flash")
-        self._llm = init_chat_model(model_id, temperature=0)
+        from coach import llm
+        # Prefer the RAG-specific model if one is set, then fall back through the coach chain.
+        preferred = model_id or os.environ.get("COACH_RAG_MODEL", "").strip()
+        chain = llm.configured_models()
+        models = ([preferred] if preferred else []) + [m for m in chain if m != preferred]
+        self._llm = llm.build_model(temperature=0, models=models)
 
     def generate(self, query, chunks):
         ctx = "\n\n".join(f"[{i}] ({c.provenance.source}) {c.text}" for i, c in enumerate(chunks))

@@ -11,10 +11,13 @@ the repo's `.env` via `EnvironmentFile`.
 | `coach-backend.service`  | service | uvicorn API on `127.0.0.1:8010`, auto-restart |
 | `coach-frontend.service` | service | `next start` PWA on `:3010` (Node 20), auto-restart |
 | `coach-litellm.service`  | service | LiteLLM gateway on `:4000` — embeddings (Ollama) + chat (CLIProxyAPI) |
-| `coach-review.service` + `.timer`  | oneshot + timer | weekly proactive review, Mondays 07:00 |
+| `coach-review.service` + `.timer`  | oneshot + timer | weekly review — checked daily 07:00 with `--if-missing`, so a failed Monday heals itself |
+| `coach-daily.service` + `.timer`   | oneshot + timer | 08:30 calm nudge (workout / weigh-in) + closes stale open sessions |
+| `coach-ntfy.service` | service | self-hosted push server on `127.0.0.1:2586` → tailnet `:8443` ([NOTIFICATIONS.md](NOTIFICATIONS.md)) |
+| `coach-alert@.service` | template | `OnFailure=` target: pushes "<unit> failed" to the phone |
 | `coach-backup.service` + `.timer`  | oneshot + timer | nightly `pg_dump` of `coachdb`, 02:30, 14-day rotation |
 | `gym-coach-tailscaled.service` | service | dedicated **userspace tailscaled** node for this app |
-| `gym-coach-serve.service` | oneshot | (re)asserts `tailscale serve` → `127.0.0.1:3010` at boot |
+| `gym-coach-serve.service` | oneshot | (re)asserts `tailscale serve`: `/` → `127.0.0.1:3010`, `:8443` → ntfy `127.0.0.1:2586` |
 
 `coach-tailscale-serve.service` is the **retired** shared-node version — disabled; one serve
 config per node made the shared link fragile. See [`PHONE_ACCESS.md`](PHONE_ACCESS.md).
@@ -32,8 +35,9 @@ systemctl --user daemon-reload
 # long-running app (+ gateway for RAG embeddings, + the phone link)
 systemctl --user enable --now coach-backend.service coach-frontend.service coach-litellm.service
 systemctl --user enable --now gym-coach-tailscaled.service gym-coach-serve.service
-# scheduled jobs
-systemctl --user enable --now coach-review.timer coach-backup.timer
+# push server + scheduled jobs
+systemctl --user enable --now coach-ntfy.service
+systemctl --user enable --now coach-review.timer coach-daily.timer coach-backup.timer
 
 # survive logout / run at boot without an active login session:
 sudo loginctl enable-linger "$USER"
@@ -59,4 +63,4 @@ systemctl --user start coach-backup.service              # back up now
   nothing is public). No nginx/Caddy needed.
 - **After a frontend code change**: rebuild (`cd web && npm run build`) then
   `systemctl --user restart coach-frontend` — `next start` serves the build, not the source.
-  If you just built an APK, rebuild again: the native export overwrites `.next`.
+  The Android app loads the live site, so it picks the change up on next open.

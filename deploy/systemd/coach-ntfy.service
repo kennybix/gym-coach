@@ -1,0 +1,23 @@
+[Unit]
+Description=Gym Coach — ntfy push server (tailnet-only; the phone subscribes via Tailscale)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/Documents/Projects/gym-coach/.env
+# Loopback only: the dedicated Tailscale node exposes it at https://gym-coach.<tailnet>.ts.net:8443
+# (gym-coach-serve.service). Nothing is published beyond the tailnet.
+ExecStartPre=/bin/mkdir -p %h/.local/share/gym-coach/ntfy
+ExecStart=%h/.local/bin/ntfy serve \
+    --listen-http 127.0.0.1:2586 \
+    --base-url ${COACH_NTFY_URL} \
+    --behind-proxy \
+    --cache-file %h/.local/share/gym-coach/ntfy/cache.db \
+    --cache-duration 72h
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=default.target

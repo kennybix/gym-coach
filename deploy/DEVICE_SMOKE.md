@@ -5,6 +5,13 @@ queue — can't be caught by the Python or Playwright suites. They only show on 
 this pass after installing a new APK, **with Tailscale ON**, before trusting a build. If a step
 fails, capture what the screen shows.
 
+## 0. Install, pair, subscribe (one-time, or after a secret rotation)
+- [ ] `python pair.py` on the computer → code 1 installs the APK over the old one.
+- [ ] Signed-out Home shows **Pair this phone** → **Scan pairing code** → code 3 → Home loads your
+      plan. (A bad or expired code says so and changes nothing.)
+- [ ] ntfy app → code 2 subscribes; `python -m coach.notify --title Test --message Hi` arrives.
+- [ ] Tap that notification's action → the Gym Coach app opens (not the browser).
+
 ## 1. It loads, syncs, and looks right
 - [ ] Opens to **Home**; the greeting and today's card clear the status bar; the tab bar
       (Home · Train · Food · Progress · Coach) is fully visible above the gesture bar.
@@ -58,6 +65,14 @@ fails, capture what the screen shows.
 
 ## 7. Native extras
 - [ ] **Setup → Sync from Health Connect** imports weight / BP / resting HR (grant access once).
+      Afterwards, a new reading in Health Connect appears after backgrounding + reopening the app
+      (auto-sync, at most every 6 h) with no permission prompt.
+- [ ] Long-press the app icon → **Weigh in** opens the weigh-in sheet; **Start workout** opens the
+      workout; **Log food** opens the food sheet.
+- [ ] With the app open on another tab, a `gymcoach://log/weight` notification tap still opens the
+      weigh-in sheet.
+- [ ] Turn Tailscale off and cold-start the app → **Can't reach your coach** page; turn it on →
+      **Try again** loads Home.
 - [ ] **Setup → Reminders**: enable one, set a time, grant the notification permission.
 
 ## 8. Layout sanity

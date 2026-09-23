@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static app shortcuts (long-press the launcher icon). Each opens a gymcoach:// deep link that
+     NativeShell routes to the matching screen or sheet. Keep the fastest logging path two taps. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="weigh_in"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_weigh_in">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="gymcoach://log/weight"
+            android:targetPackage="com.gymcoach.app"
+            android:targetClass="com.gymcoach.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="workout"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_workout">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="gymcoach://workout"
+            android:targetPackage="com.gymcoach.app"
+            android:targetClass="com.gymcoach.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="food"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_food">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="gymcoach://food"
+            android:targetPackage="com.gymcoach.app"
+            android:targetClass="com.gymcoach.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="bp"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_bp">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="gymcoach://log/bp"
+            android:targetPackage="com.gymcoach.app"
+            android:targetClass="com.gymcoach.app.MainActivity" />
+    </shortcut>
+</shortcuts>

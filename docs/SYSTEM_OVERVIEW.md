@@ -59,7 +59,10 @@ works on `localhost:3010` (rewrites hit the local backend) and on the `ts.net` U
 | Frontend (Next PWA) | 3010 | **user** systemd | `coach-frontend.service` |
 | Tailscale node (dedicated) | — | **user** systemd | `gym-coach-tailscaled.service` (userspace tailscaled) |
 | Tailscale serve re-apply | — | **user** systemd | `gym-coach-serve.service` (oneshot, boot) |
-| Weekly review | — | **user** timer | `coach-review.timer` → `coach-review.service` (Mon 07:00) |
+| Push server (ntfy) | 2586 → tailnet :8443 | **user** systemd | `coach-ntfy.service` — see [`deploy/NOTIFICATIONS.md`](../deploy/NOTIFICATIONS.md) |
+| Weekly review | — | **user** timer | `coach-review.timer` → `coach-review.service` (daily 07:00, `--if-missing`: runs once per week, self-heals if Monday failed) |
+| Morning nudge + housekeeping | — | **user** timer | `coach-daily.timer` → `coach-daily.service` (08:30) |
+| Failure alerts | — | **user** template | `coach-alert@.service` — `OnFailure=` on review/daily/backup pushes to the phone |
 | Nightly DB backup | — | **user** timer | `coach-backup.timer` → `coach-backup.service` (02:30) |
 
 Unit sources live in [`deploy/systemd/`](../deploy/systemd/); installed copies in
@@ -73,11 +76,21 @@ hard-killing the backend revives it in ~7s; full chain survives reboot.
 
 ## 4. LLM wiring (the important, non-obvious part)
 
-- **Chat** (coach graph, weekly review, proactive insight): langchain `init_chat_model`
-  with `COACH_MODEL=openai:gpt-5.5` + `OPENAI_BASE_URL`/`OPENAI_API_KEY` pointing at the CLI
-  proxy (`http://127.0.0.1:8317/v1`). The proxy is OpenAI-compatible, so this needs **zero
-  app code** — just env. (Gemini chat also works via the proxy, but its **structured-output**
-  path fails through the OpenAI shim — returns prose not JSON — so keep review/judge on gpt-5.5.)
+- **Chat** (coach graph, weekly review, insight, vision, parsing) goes through **one failover
+  wrapper**, [`coach/llm.py`](../coach/llm.py). `COACH_MODELS` is a ranked list — on this machine
+  `openai:gpt-5.5, openai:claude-sonnet-5, openai:gemini-3.8-flash-high`, all through the CLI proxy
+  (`OPENAI_BASE_URL`/`OPENAI_API_KEY` → `http://127.0.0.1:8317/v1`). Each call tries them in order,
+  **remembers provider cooldowns** parsed from 429s (`reset_seconds`) so a cooling model is skipped
+  instantly, and only if all fail raises `CoachUnavailable` → a 503 carrying `retry_at`, which the
+  UI turns into "offline until about Thursday 2 PM". `GET /coach/status` reports each model's health.
+  - **Why:** on 2026-09-19 `gpt-5.5` entered a 128-hour cooldown and, with a single configured
+    model, every coach surface died and Monday's review crashed — while the proxy was serving 37
+    other models.
+  - **Structured output uses `method="function_calling"`:** non-OpenAI models ignore
+    `response_format` through the proxy's shim (prose, not JSON) but honour tool calls. Probed
+    2026-09-22: sonnet-5 and gemini-3.8-flash pass tools + structured + vision; `gpt-oss` fails
+    structured; `claude-opus-5-5` needs a newer Claude Code build inside the proxy.
+  - `temperature` is omitted for `claude-*` ids (recent Claude models reject it).
 - **Embeddings** (RAG): the CLI proxy has **no** embeddings endpoint. So a **LiteLLM gateway**
   (`:4000`) exposes `/v1/embeddings` backed by local **Ollama `mxbai-embed-large` (1024-d)** —
   free, private. gym-coach `.env`: `COACH_EMBED_BACKEND=litellm`, `EMBED_DIM=1024`.
@@ -126,11 +139,15 @@ fresh DB end to end.
   disabled — one serve config per node made the shared link fragile.)
 - Set up once: enable HTTPS in the Tailscale admin console and
   `sudo tailscale set --operator=$USER`.
-- **Also installable as an APK** — the Capacitor shell adds Health Connect import and local
-  notifications ([`deploy/ANDROID_APP.md`](../deploy/ANDROID_APP.md)); it's served for
-  sideloading at `/gym-coach.apk`.
-- **No credentials in the JS bundle** — the bearer token is pasted once under
-  **Setup → Signed in** and kept in the device's localStorage. `web/.env.local` must NOT contain `NEXT_PUBLIC_DEV_TOKEN`
+- **The Android app is a shell around the live site** (Capacitor `server.url`), so UI deploys
+  reach the phone without a reinstall; it adds Health Connect (auto-sync on foreground), deep
+  links, home-screen shortcuts and an offline page ([`deploy/ANDROID_APP.md`](../deploy/ANDROID_APP.md)).
+  Served for sideloading at `/gym-coach.apk`.
+- **Signing a phone in is a QR scan:** `python pair.py` shows install / notifications / sign-in
+  codes; the app's **Scan pairing code** button (or the camera → `/pair#t=…`) stores the token.
+  The fragment never reaches a server log. No credentials in the JS bundle.
+- **Push notifications** come from a self-hosted ntfy on the same node at `:8443`
+  ([`deploy/NOTIFICATIONS.md`](../deploy/NOTIFICATIONS.md)). `web/.env.local` must NOT contain `NEXT_PUBLIC_DEV_TOKEN`
   for any served build. `apiBase()` returns same-origin (relative) so the Setup "API URL" is
   optional. Mint a token: `SUPABASE_JWT_SECRET=... python mint_token.py <uuid>`.
 - To go **public** later (share beyond the tailnet): custom domain via the droplet
@@ -152,7 +169,16 @@ systemctl --user restart coach-backend
 # after a FRONTEND code change (must rebuild — next start serves the build)
 cd ~/Documents/Projects/gym-coach/web && nvm use 20 && npm run build && systemctl --user restart coach-frontend
 
-# run the weekly review now / back up now
+# connect a phone (install / notifications / sign in — QR codes in the terminal)
+python pair.py                 # or: python pair.py --sign-in
+
+# coach model health + push test + today's nudge preview
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8010/coach/status
+python -m coach.notify --title Test --message Hello
+python -m coach.daily --dry-run
+
+# run the weekly review now (--if-missing skips anyone already reviewed this week) / back up now
+.venv/bin/python -m coach.run_review
 systemctl --user start coach-review.service
 systemctl --user start coach-backup.service        # → ~/.local/share/gym-coach/backups/
 
@@ -166,8 +192,8 @@ cd ~/Documents/Projects/gym-coach && set -a; . ./.env; set +a
 cd web && npm test                                   # Vitest: the offline queue
 cd web && TK=$(python ../mint_token.py <uuid> | awk '/token:/{print $2}') npm run test:e2e
 
-# rebuild the Android APK (then RESTORE the server build — see the gotcha below)
-bash deploy/build-apk.sh && (cd web && npm run build) && systemctl --user restart coach-frontend
+# rebuild + publish the Android APK — only needed when native parts change
+bash deploy/build-apk.sh
 
 # restore a backup
 gunzip -c <file>.sql.gz | PGPASSWORD=coach psql -h localhost -U coach -d coachdb
@@ -176,9 +202,7 @@ gunzip -c <file>.sql.gz | PGPASSWORD=coach psql -h localhost -U coach -d coachdb
 **Toolchain gotchas:** frontend needs **Node 20** via nvm (Tailwind v4 oxide); `next dev`
 trips this machine's inotify watcher limit, so production build + `next start` is used.
 Python backend uses the repo `.venv`. Secrets live in `.env` (gitignored).
-**The APK build clobbers the server build** — `deploy/build-apk.sh` runs
-`NATIVE_BUILD=1 next build` (static export), so always re-run `npm run build` and restart
-`coach-frontend` afterwards or the served site becomes the static export.
+The APK no longer bundles a static export, so building it can't clobber the served site.
 
 ---
 
@@ -255,7 +279,23 @@ design-program,parse-workout,parse-food-photo,photo-note,compare-photos}`.
 
 ---
 
-## 10. Open items (pre-real-launch)
+## 10. Operational lessons (2026-09-22 review)
+
+Ten days of unattended running after launch exposed three failures no test suite caught:
+1. **Rotating the signing secret locked the phone out for ten days** — the only way back in was
+   re-pasting a 195-character token by hand. → QR pairing (`pair.py`), a *Scan* button on the
+   expired-session banner.
+2. **One rate-limited model took the whole coach down for days**, and the weekly review crashed
+   silently. → `COACH_MODELS` failover, a daily self-healing review timer, `OnFailure=` alerts,
+   honest "back around…" copy.
+3. **The phone ran a two-month-old bundled UI** and nothing ever reached out, so nothing got
+   logged — four straight reviews said *insufficient data*. → the APK loads the live site, push
+   notifications, a calm morning nudge, deep links and shortcuts, silent Health Connect sync.
+
+Check the logs, not just the tests: `journalctl --user -u coach-backend` shows each device's
+requests and status codes; a run of 401s from the phone's tailnet IP means it's signed out.
+
+## 11. Open items (pre-real-launch)
 
 1. **Clinician signs** the safety checklist ([`deploy/SAFETY_REVIEW.md`](../deploy/SAFETY_REVIEW.md)).
 2. **Availability** beyond this machine — only up while the desktop is awake; the always-on

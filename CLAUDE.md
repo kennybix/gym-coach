@@ -27,8 +27,12 @@ coach/
   graph.py          LangGraph coach: hydrate→screen→agent→tools→safety→commit→guard
                     (+ evidence summarisation and proposal diffs for the UI)
   tools.py          the agent's read tools + propose_* tools (stage only, never write)
+  llm.py            model FAILOVER for every LLM surface (COACH_MODELS, cooldown memory,
+                    CoachUnavailable -> 503 with retry_at). Always build models through it.
   review.py         weekly-review graph (scheduled; target writes are engine-owned)
-  run_review.py     scheduler entrypoint (systemd timer) — runs the review for every user
+  run_review.py     review batch: daily timer + --if-missing (self-healing), pushes the result
+  notify.py         push to the phone via self-hosted ntfy (no-op when unconfigured)
+  daily.py          08:30 job: one calm nudge (workout / weigh-in) + stale-session housekeeping
   adaptive.py       deterministic adaptive-calorie-target engine (observed maintenance from
                     logs; the ONLY source of automated target adjustments)
   safety.py         deterministic gate: target/program checks, goal-rate cap, content
@@ -59,13 +63,18 @@ web/
   components/ui/    design-system primitives: Sheet, Empty, Ring, PageHeader
   lib/theme.ts      the five looks + the no-flash stamping script
   lib/queue.ts      IndexedDB offline write queue (replays on reconnect)
+  lib/pairing.ts    QR sign-in (parse /pair#t= | gymcoach://pair | raw token; store it)
+  lib/deeplinks.ts  gymcoach:// -> route (notification taps, shortcuts)
+  native-shell/     the Android app's local files: offline page only (the UI is loaded live)
   app/globals.css   design tokens (one CSS-variable block per look) + type scale + components
   e2e/              Playwright read-only pass over every screen
-  android/          Capacitor Android project (Health Connect, notifications, camera)
+  android/          Capacitor shell around the LIVE site (server.url): Health Connect, deep links,
+                    home-screen shortcuts, camera, notifications
 seed/               committed catalog seed (exercises + variant graph)
 scripts/migrate.sh  tracked migration runner (schema_migrations table)
 dev_up.sh           one-command local bring-up (Postgres + migrations)
-mint_token.py       mint a bearer token for Setup
+pair.py             QR codes in the terminal: install the APK, subscribe to pushes, sign in
+mint_token.py       mint a bearer token (pair.py is the friendlier way)
 ```
 
 Migrations: `001_core`, `002_rls_supabase` (Supabase-only, skipped), `003_targets_append_only`,
@@ -86,30 +95,32 @@ pip install -r requirements.txt
 set -a; . ./.env; set +a            # COACH_DB_URI, COACH_SEED_DIR, SUPABASE_JWT_SECRET (required),
                                     # COACH_MODEL + OPENAI_BASE_URL/KEY (the CLI proxy),
                                     # COACH_EMBED_* + EMBED_DIM (the LiteLLM gateway),
-                                    # COACH_PUBLIC_URL (the served URL; used to build the APK)
+                                    # COACH_PUBLIC_URL (the served URL; the APK loads it),
+                                    # COACH_MODELS (failover chain), COACH_NTFY_* (pushes)
 
 # 4. Run (ports on this machine: backend 8010, frontend 3010 — 8000/3000 are taken)
 uvicorn coach.service:app --port 8010
 cd web && npm run build && npm start -- --port 3010     # Node 20; `next dev` hits this
                                                         # machine's inotify limit — use build
 
-# 5. Token, then the first-run wizard
-python mint_token.py <uuid>         # paste in Setup -> Signed in
+# 5. Connect the phone, then the first-run wizard
+python pair.py                      # scan the codes; "Scan pairing code" in the app
 
 # Tests
-python -m pytest coach/tests -q                    # 90 pass, 8 DB tests skip without a DSN
-COACH_DB_URI=... python -m pytest coach/tests -q   # 98 pass (DB tests use a throwaway user)
-cd web && npm test                                 # Vitest (offline queue)
+python -m pytest coach/tests -q                    # 117 pass, 8 DB tests skip without a DSN
+COACH_DB_URI=... python -m pytest coach/tests -q   # 125 pass (DB tests use a throwaway user)
+cd web && npm test                                 # Vitest (offline queue, pairing, deep links)
 cd web && TK=<token> npm run test:e2e              # Playwright, needs the stack running
 COACH_DB_URI=... COACH_SEED_DIR=... python -m coach.smoke_test
 COACH_DB_URI=... COACH_SEED_DIR=... python -m coach.e2e_test
 ```
 
-LLM is provider-agnostic via `init_chat_model`; the code default is
-`google_genai:gemini-3.5-flash`, but this deployment runs `COACH_MODEL=openai:gpt-5.5` against
-the local CLI proxy. Override per surface with `COACH_MODEL` / `COACH_RAG_MODEL` /
-`COACH_JUDGE_MODEL`. Keep structured-output surfaces (review, judge) on gpt-5.5 — Gemini's
-structured path fails through the OpenAI shim.
+LLM: every coach surface builds its model with `llm.build_model()`, which reads the ranked
+`COACH_MODELS` chain (falls back to `COACH_MODEL`). This deployment runs `openai:gpt-5.5`,
+`openai:claude-sonnet-5`, `openai:gemini-3.8-flash-high` through the local CLI proxy. Structured
+output defaults to `method="function_calling"` because non-OpenAI models ignore `response_format`
+through the proxy's shim. **Never construct a model with `init_chat_model` directly in app code**
+— a single model is a single point of failure (see SYSTEM_OVERVIEW §10).
 
 ## Architecture invariants — do not break
 
@@ -134,6 +145,10 @@ structured path fails through the OpenAI shim.
 - **Cross-user/missing writes fail loudly** (raise), never silent no-ops.
 - **The coach is optional at startup.** Missing LLM config must not take down the logging API —
   coach endpoints return 503; everything else keeps working.
+- **The coach is resilient at runtime.** A rate-limited or failing model falls back to the next in
+  `COACH_MODELS`; only when all fail is it a 503 — with `retry_at`, so the UI can say when it's
+  back instead of "try again shortly". Scheduled jobs must never fail silently: model outages are
+  deferred and alerted in-process; anything else exits non-zero so `OnFailure=` pushes an alert.
 
 ## Safety & wellbeing invariants — do not weaken
 
@@ -153,6 +168,9 @@ This is a health-adjacent product. These are deliberate and must be preserved:
   from onboarding/engine/coach. The Food screen leads with protein as a goal and shows calories
   plainly with no over/under verdict. Progress shows the maintenance *estimate*, never a
   suggested target. Keep this framing.
+- **Nudges stay calm** (`daily.py`): at most one a day, only when there's something to do, no
+  guilt/streak-loss language, back off to Mondays after 14 quiet days, and **never a weigh-in
+  prompt for users with eating-disorder history**. Covered by `tests/test_resilience.py`.
 - **Content screening** (inbound + outbound) routes disordered-eating / self-harm /
   extreme-deficit / train-through-injury signals to support, never to optimized advice.
 - **Crisis copy is single-sourced in `safety.py`** (`REDIRECTS` / `redirect_for`): numberless, no
@@ -184,10 +202,12 @@ This is a health-adjacent product. These are deliberate and must be preserved:
 
 **Live and running** on the owner's Linux desktop as systemd user services, served to their
 Android phone over Tailscale at `https://gym-coach.<your-tailnet>.ts.net` (tailnet-only
-HTTPS) as a PWA and a sideloaded Capacitor APK. Coach runs on **GPT-5.5 via the local CLI
-proxy**; embeddings via a **LiteLLM→Ollama** gateway; RAG corpus populated (257 chunks).
-Restart-resilient (`Restart=always`, linger on). All suites green: 98 pytest, 5 Vitest,
-10 Playwright.
+HTTPS) as a PWA and a sideloaded Capacitor APK that loads the live site. The coach runs on a
+**failover chain via the local CLI proxy** (gpt-5.5 → claude-sonnet-5 → gemini-3.8-flash);
+embeddings via a **LiteLLM→Ollama** gateway; RAG corpus populated (257 chunks). The server reaches
+the phone through a self-hosted **ntfy** (weekly review, morning nudge, failure alerts); phones
+sign in by **QR** (`pair.py`). Restart-resilient (`Restart=always`, linger on). All suites green:
+125 pytest, 11 Vitest, 12 Playwright.
 
 **Read [`docs/SYSTEM_OVERVIEW.md`](docs/SYSTEM_OVERVIEW.md) first** — it documents the whole
 running system (architecture, ports, services, LLM wiring, phone access, operations) for the
@@ -209,9 +229,11 @@ here over Tailscale); import/restore to complete the export story.
 
 ## Gotchas
 
-- **The APK build clobbers the server build.** `deploy/build-apk.sh` runs
-  `NATIVE_BUILD=1 next build` (a static export). After building an APK you **must** re-run
-  `npm run build` and restart `coach-frontend`, or the served site is the static export.
+- **The Android app loads the live site** (`server.url`). UI changes need only a web rebuild +
+  `coach-frontend` restart; rebuild the APK (`deploy/build-apk.sh`, which also republishes it)
+  only for native changes. Test APKs on the emulator first — recipe in `deploy/ANDROID_APP.md`.
+- **Tests don't show whether the product is used.** Before calling anything done, read
+  `journalctl --user -u coach-backend` for the phone's tailnet IP: 401s mean it's signed out.
 - **Frontend needs Node 20** (`nvm use 20`) — Tailwind v4 oxide. `next dev` trips this machine's
   inotify watcher limit, so always build + `next start`.
 - `web/` install can collide with a global `~/.npmrc` `prefix` setting; if `npm install` errors
